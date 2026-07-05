@@ -1,0 +1,9 @@
+spring:
+  datasource:
+    url: ${TICKETOPS_DATASOURCE_URL:jdbc:postgresql://localhost:5432/ticketops}
+    driver-class-name: org.postgresql.Driver
+    username: ${TICKETOPS_DATASOURCE_USERNAME:ticketops}
+    password: ${TICKETOPS_DATASOURCE_PASSWORD:ticketops}
+  sql:
+    init:
+      mode: always
