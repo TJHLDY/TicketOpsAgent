@@ -18,7 +18,8 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 1.1.8 BOM, with ChatClient integration prepared for the next phase.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 30 automated tests passing at the latest verification.
+- 32 automated tests passing at the latest verification.
+- `AgentDecisionPort` boundary in place with deterministic and shadow-mode scaffolding.
 - No real enterprise system integration.
 
 ## Implemented MVP Scenarios
@@ -65,7 +66,8 @@ Expected chain:
 - Does not connect to LDAP, SSO, IAM, OA, or a real ticket system.
 - Does not execute unlock, reset password, grant permission, or close-ticket operations.
 - Write operations are represented only as `pending_action` rows.
-- Current agent routing is deterministic. Real LLM decision support is planned behind `shadow` mode.
+- Default agent routing is deterministic.
+- `ticketops.agent.mode=shadow` keeps deterministic user-facing output and records shadow decision traces. If no LLM decision port is configured yet, it records `LLM_SHADOW_SKIPPED`.
 - Current SOP retrieval is keyword/table driven, not vector RAG.
 
 ## Run Tests
@@ -79,6 +81,25 @@ Run only the lightweight Eval cases:
 ```powershell
 mvn test "-Dtest=MinimalEvalCaseTest"
 ```
+
+## Agent Mode
+
+Default mode is deterministic:
+
+```yaml
+ticketops:
+  agent:
+    mode: deterministic
+```
+
+Run in shadow mode from PowerShell:
+
+```powershell
+$env:TICKETOPS_AGENT_MODE='shadow'
+mvn spring-boot:run
+```
+
+Current shadow behavior is intentionally conservative: deterministic output is still returned to the caller. The next implementation step is a DeepSeek-backed `AgentDecisionPort` that writes comparable LLM decisions into trace logs.
 
 ## Database
 
@@ -126,10 +147,9 @@ Each request persists the ticket and execution evidence to `ticket`, `agent_trac
 
 The next phase keeps the deterministic baseline and adds real model support safely:
 
-1. Introduce `AgentDecisionPort`.
-2. Move current rules into `DeterministicAgentDecisionService`.
-3. Add `deterministic / llm / shadow / hybrid` modes.
-4. Use `shadow` mode first: return deterministic results while recording LLM decisions for comparison.
-5. Integrate DeepSeek through Spring AI after the decision boundary and fallback logic are in place.
+1. Add a DeepSeek-backed `AgentDecisionPort` through Spring AI `ChatClient`.
+2. Keep `shadow` mode first: return deterministic results while recording LLM decisions for comparison.
+3. Add fallback fields such as `llm_status`, `fallback_reason`, and `fallback_to` to trace logs.
+4. Promote to `llm` or `hybrid` mode only after Eval cases show stable behavior.
 
 DeepSeek keys must be supplied through environment variables, never committed.

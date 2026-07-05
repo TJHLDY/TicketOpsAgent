@@ -1,15 +1,24 @@
 package com.tzq.ticketops.agent;
 
+import com.tzq.ticketops.agent.decision.AgentContext;
+import com.tzq.ticketops.agent.decision.AgentDecision;
+import com.tzq.ticketops.agent.decision.AgentDecisionPort;
+import com.tzq.ticketops.agent.decision.AgentMode;
+import com.tzq.ticketops.agent.decision.DeterministicAgentDecisionService;
 import com.tzq.ticketops.rag.SopSearchService;
 import com.tzq.ticketops.tools.AccountStatusResult;
 import com.tzq.ticketops.tools.MockAccountStatusTool;
 import com.tzq.ticketops.tools.MockUserPermissionsTool;
 import com.tzq.ticketops.tools.UserPermissionsResult;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
+import java.util.stream.Collectors;
 
 @Service
 public class AgentOrchestrator {
@@ -17,8 +26,31 @@ public class AgentOrchestrator {
     private final SopSearchService sopSearchService;
     private final MockAccountStatusTool accountStatusTool;
     private final MockUserPermissionsTool permissionsTool;
+    private final AgentMode agentMode;
+    private final AgentDecisionPort decisionPort;
+    private final AgentDecisionPort shadowDecisionPort;
 
+    @Autowired
     public AgentOrchestrator(
+            SopSearchService sopSearchService,
+            MockAccountStatusTool accountStatusTool,
+            MockUserPermissionsTool permissionsTool,
+            @Value("${ticketops.agent.mode:deterministic}") String agentModeValue
+    ) {
+        this(
+                parseAgentMode(agentModeValue),
+                new DeterministicAgentDecisionService(),
+                null,
+                sopSearchService,
+                accountStatusTool,
+                permissionsTool
+        );
+    }
+
+    private AgentOrchestrator(
+            AgentMode agentMode,
+            AgentDecisionPort decisionPort,
+            AgentDecisionPort shadowDecisionPort,
             SopSearchService sopSearchService,
             MockAccountStatusTool accountStatusTool,
             MockUserPermissionsTool permissionsTool
@@ -26,20 +58,51 @@ public class AgentOrchestrator {
         this.sopSearchService = sopSearchService;
         this.accountStatusTool = accountStatusTool;
         this.permissionsTool = permissionsTool;
+        this.agentMode = agentMode;
+        this.decisionPort = decisionPort;
+        this.shadowDecisionPort = shadowDecisionPort;
     }
 
     public static AgentOrchestrator createDefault() {
-        return new AgentOrchestrator(new SopSearchService(), new MockAccountStatusTool(), new MockUserPermissionsTool());
+        return new AgentOrchestrator(
+                new SopSearchService(),
+                new MockAccountStatusTool(),
+                new MockUserPermissionsTool(),
+                AgentMode.DETERMINISTIC.name()
+        );
+    }
+
+    public static AgentOrchestrator createWithDecisionMode(
+            AgentMode agentMode,
+            AgentDecisionPort shadowDecisionPort,
+            SopSearchService sopSearchService,
+            MockAccountStatusTool accountStatusTool,
+            MockUserPermissionsTool permissionsTool
+    ) {
+        return new AgentOrchestrator(
+                agentMode,
+                new DeterministicAgentDecisionService(),
+                shadowDecisionPort,
+                sopSearchService,
+                accountStatusTool,
+                permissionsTool
+        );
     }
 
     public AgentResponse handle(AgentRequest request) {
-        String text = request.title() + "\n" + request.description();
-        TicketCategory category = classify(text);
-        TicketPriority priority = priorityFor(category);
-        RiskLevel riskLevel = riskFor(category, text);
+        AgentContext context = new AgentContext(request.requesterId(), request.title(), request.description());
+        AgentDecision decision = decisionPort.decide(context);
+        TicketCategory category = decision.category();
+        TicketPriority priority = decision.priority();
+        RiskLevel riskLevel = decision.riskLevel();
 
         List<TraceEvent> traceEvents = new ArrayList<>();
         traceEvents.add(new TraceEvent("CLASSIFY", "category=" + category + ", priority=" + priority + ", risk=" + riskLevel));
+        if (agentMode == AgentMode.SHADOW) {
+            traceEvents.add(shadowDecisionPort == null
+                    ? skippedShadowTraceEvent()
+                    : shadowTraceEvent(shadowDecisionPort.decide(context)));
+        }
 
         if (riskLevel == RiskLevel.REJECT) {
             return rejectedResponse(category, priority, riskLevel, traceEvents);
@@ -180,48 +243,6 @@ public class AgentOrchestrator {
         );
     }
 
-    private TicketCategory classify(String text) {
-        if (text.contains("锁定") || text.contains("账号已锁")) {
-            return TicketCategory.ACCOUNT_LOCKED;
-        }
-        if (text.contains("MFA") || text.contains("验证码") || text.contains("多因素")) {
-            return TicketCategory.MFA_ISSUE;
-        }
-        if (text.contains("权限") || text.contains("无权访问")) {
-            return TicketCategory.PERMISSION_REQUEST;
-        }
-        if (text.contains("登录") || text.contains("登陆")) {
-            return TicketCategory.LOGIN_FAILED;
-        }
-        return TicketCategory.UNKNOWN;
-    }
-
-    private TicketPriority priorityFor(TicketCategory category) {
-        return switch (category) {
-            case ACCOUNT_LOCKED, MFA_ISSUE -> TicketPriority.P2;
-            case LOGIN_FAILED, PERMISSION_REQUEST -> TicketPriority.P3;
-            case UNKNOWN -> TicketPriority.P3;
-        };
-    }
-
-    private RiskLevel riskFor(TicketCategory category, String text) {
-        if (containsUnsafePrivilegeRequest(text)) {
-            return RiskLevel.REJECT;
-        }
-        return switch (category) {
-            case ACCOUNT_LOCKED, MFA_ISSUE, PERMISSION_REQUEST -> RiskLevel.NEEDS_APPROVAL;
-            case LOGIN_FAILED -> RiskLevel.READ_ONLY;
-            case UNKNOWN -> RiskLevel.REJECT;
-        };
-    }
-
-    private boolean containsUnsafePrivilegeRequest(String text) {
-        return text.contains("绕过审批")
-                || text.contains("管理员权限")
-                || text.contains("生产系统管理员")
-                || text.contains("越权");
-    }
-
     private String extractAppCode(String text) {
         if (text.contains("CRM")) {
             return "CRM";
@@ -233,5 +254,33 @@ public class AgentOrchestrator {
             return "VPN";
         }
         return "OA";
+    }
+
+    private TraceEvent shadowTraceEvent(AgentDecision shadowDecision) {
+        String toolIntents = shadowDecision.toolIntents().stream()
+                .map(intent -> intent.toolName())
+                .collect(Collectors.joining(","));
+        if (toolIntents.isBlank()) {
+            toolIntents = "none";
+        }
+        return new TraceEvent(
+                "LLM_SHADOW",
+                "category=" + shadowDecision.category()
+                        + ", priority=" + shadowDecision.priority()
+                        + ", risk=" + shadowDecision.riskLevel()
+                        + ", confidence=" + shadowDecision.confidence()
+                        + ", toolIntents=" + toolIntents
+        );
+    }
+
+    private static AgentMode parseAgentMode(String agentModeValue) {
+        return AgentMode.valueOf(agentModeValue.trim().replace('-', '_').toUpperCase(Locale.ROOT));
+    }
+
+    private TraceEvent skippedShadowTraceEvent() {
+        return new TraceEvent(
+                "LLM_SHADOW_SKIPPED",
+                "agentMode=SHADOW, reason=no_shadow_decision_port"
+        );
     }
 }
