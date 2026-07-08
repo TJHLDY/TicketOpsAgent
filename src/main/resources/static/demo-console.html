@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TicketOpsAgent Demo Console</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="demo-console.css">
+</head>
+<body>
+<main class="shell">
+    <header class="topbar">
+        <div>
+            <p class="eyebrow">Local Backend Agent Prototype</p>
+            <h1>TicketOpsAgent Demo Console</h1>
+            <p class="lede">
+                This local static demo console visualizes deterministic ticket handling, audit traces,
+                read-only mock tools, pending action review, and DeepSeek shadow evidence.
+            </p>
+        </div>
+        <div class="status-stack">
+            <span class="status-pill">Spring Boot static page</span>
+            <span class="status-pill">No real enterprise operation</span>
+        </div>
+    </header>
+
+    <section class="boundary-panel" aria-label="Boundaries">
+        <div>
+            <strong>User-facing result is produced by the deterministic main flow.</strong>
+            DeepSeek output is treated as a shadow candidate. Invalid or unsafe shadow output falls back to
+            deterministic handling.
+        </div>
+        <div>
+            <strong>It does not execute real enterprise operations.</strong>
+            Approve / reject only updates local audit state. executionStatus remains
+            <code>NOT_EXECUTED_MOCK_ONLY</code>.
+        </div>
+    </section>
+
+    <section class="layout">
+        <form id="ticket-form" class="panel submit-panel">
+            <div class="panel-heading">
+                <div>
+                    <p class="eyebrow">A. Submit</p>
+                    <h2>Ticket Intake</h2>
+                </div>
+                <button class="primary-action" type="submit">Submit Ticket</button>
+            </div>
+
+            <label>
+                <span>Title</span>
+                <input id="title" name="title" type="text" autocomplete="off" required>
+            </label>
+            <label>
+                <span>Description</span>
+                <textarea id="description" name="description" rows="5" required></textarea>
+            </label>
+            <label>
+                <span>Requester ID</span>
+                <input id="requesterId" name="requesterId" type="text" autocomplete="off" required>
+            </label>
+
+            <div class="sample-grid" aria-label="Sample tickets">
+                <button type="button" data-sample="accountLocked">OA account locked</button>
+                <button type="button" data-sample="permissionRequest">CRM permission request</button>
+                <button type="button" data-sample="mfaIssue">VPN MFA issue</button>
+                <button type="button" data-sample="promptInjection">Prompt injection / admin request</button>
+                <button type="button" data-sample="nonIt">Non-IT request</button>
+            </div>
+        </form>
+
+        <section class="panel result-panel" aria-live="polite">
+            <div class="panel-heading">
+                <div>
+                    <p class="eyebrow">Agent Result</p>
+                    <h2>Current Run</h2>
+                </div>
+                <span id="run-status" class="status-pill muted">Idle</span>
+            </div>
+            <div class="metric-grid">
+                <div>
+                    <span>Ticket ID</span>
+                    <strong id="current-ticket-id">-</strong>
+                </div>
+                <div>
+                    <span>Category</span>
+                    <strong id="result-category">-</strong>
+                </div>
+                <div>
+                    <span>Priority</span>
+                    <strong id="result-priority">-</strong>
+                </div>
+                <div>
+                    <span>Risk</span>
+                    <strong id="result-risk">-</strong>
+                </div>
+            </div>
+            <h3>User Reply Draft</h3>
+            <p id="reply-draft" class="draft-text">Submit a sample ticket to see the deterministic response.</p>
+            <h3>Internal Suggestion</h3>
+            <p id="suggestion" class="draft-text">-</p>
+        </section>
+    </section>
+
+    <section class="panel">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">B. Ticket</p>
+                <h2>Ticket Detail</h2>
+            </div>
+            <button id="refresh-ticket" type="button">Refresh Ticket</button>
+        </div>
+        <div id="ticket-detail" class="detail-grid empty-state">No ticket selected.</div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">C. Trace</p>
+                <h2>Agent Trace Timeline</h2>
+            </div>
+            <button id="refresh-trace" type="button">Refresh Trace</button>
+        </div>
+        <div id="trace-timeline" class="trace-timeline empty-state">No trace events yet.</div>
+    </section>
+
+    <section class="layout">
+        <section class="panel">
+            <div class="panel-heading">
+                <div>
+                    <p class="eyebrow">D. Tools</p>
+                    <h2>Tool Calls</h2>
+                </div>
+                <button id="refresh-tools" type="button">Refresh</button>
+            </div>
+            <div id="tool-calls" class="stack empty-state">No tool calls yet.</div>
+        </section>
+
+        <section class="panel">
+            <div class="panel-heading">
+                <div>
+                    <p class="eyebrow">D. Review</p>
+                    <h2>Pending Actions</h2>
+                </div>
+                <button id="refresh-actions" type="button">Refresh</button>
+            </div>
+            <p class="notice">
+                Pending action review is audit-only. Approve Review / Reject Review update local review state only.
+                executionStatus remains <code>NOT_EXECUTED_MOCK_ONLY</code>.
+                Approve Review / Reject Review never unlock accounts, reset passwords, grant permissions, dispatch tickets, or close tickets.
+            </p>
+            <div id="pending-actions" class="stack empty-state">No pending actions yet.</div>
+        </section>
+    </section>
+
+    <section class="panel">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">E. Evidence</p>
+                <h2>Eval / Acceptance Report</h2>
+            </div>
+            <button id="refresh-eval" type="button">Refresh Eval</button>
+        </div>
+        <div id="eval-report" class="metric-grid empty-state">Run scripts/accept.ps1 to generate local evidence.</div>
+    </section>
+</main>
+
+<template id="field-template">
+    <div class="field-row">
+        <span></span>
+        <strong></strong>
+    </div>
+</template>
+
+<script src="demo-console.js" defer></script>
+</body>
+</html>

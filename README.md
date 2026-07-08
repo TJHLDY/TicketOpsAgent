@@ -20,7 +20,7 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 1.1.8 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 55 automated tests passing at the latest verification.
+- 57 automated tests passing at the latest verification.
 - `AgentDecisionPort` boundary in place with deterministic routing plus DeepSeek shadow evaluation.
 - DeepSeek shadow mode calls the model, parses a candidate `AgentDecision`, validates enums/tools/pending actions/confidence, and falls back to deterministic output on validation/API errors.
 - Mock LLM shadow Eval runner covers 34 accepted, unsafe, invalid model-output, tool-argument, and pending-action mismatch cases without requiring a real API key.
@@ -96,6 +96,12 @@ mvn spring-boot:run
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\demo-backend-api.ps1 -BaseUrl http://localhost:8080
 ```
 
+Open the lightweight static demo console:
+
+```text
+http://localhost:8080/demo-console.html
+```
+
 Optional DeepSeek live smoke:
 
 ```powershell
@@ -134,7 +140,7 @@ The deterministic path remains the user-facing main flow. The DeepSeek path is a
 
 Latest local validation before public release:
 
-- `mvn test`: 55 tests PASS
+- `mvn test`: 57 tests PASS
 - `scripts\accept.ps1`: PASS
 - Secret scan: PASS
 - Shadow eval: 34 cases
@@ -145,6 +151,24 @@ Latest local validation before public release:
 - Demo script: 7-step backend flow PASS
 
 These numbers are local validation evidence, not a production SLA.
+
+## Lightweight Demo Console
+
+Start the app:
+
+```powershell
+mvn spring-boot:run
+```
+
+Open:
+
+```text
+http://localhost:8080/demo-console.html
+```
+
+The console demonstrates ticket creation through `/api/agent/chat`, ticket detail lookup, trace timeline, read-only tool call evidence, pending action review with `NOT_EXECUTED_MOCK_ONLY`, and eval report summary.
+
+The console is a local static demo page only. It does not add login, RBAC, real enterprise integrations, real execution, LLM main decisioning, hybrid mode, or production RAG.
 
 ## Demo Data
 
@@ -175,7 +199,7 @@ This repository is not a production AI Agent or production ITSM system. It does 
 - [x] Backend API productization
 - [x] Backend API demo script
 - [x] Public portfolio README hardening
-- [ ] Lightweight static demo console
+- [x] Lightweight static demo console
 - [ ] Optional API error contract hardening
 
 ## Documentation
