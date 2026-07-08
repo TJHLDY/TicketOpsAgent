@@ -18,10 +18,11 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 1.1.8 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 43 automated tests passing at the latest verification.
+- 44 automated tests passing at the latest verification.
 - `AgentDecisionPort` boundary in place with deterministic routing plus DeepSeek shadow evaluation.
 - DeepSeek shadow mode calls the model, parses a candidate `AgentDecision`, validates enums/tools/pending actions/confidence, and falls back to deterministic output on validation/API errors.
 - Mock LLM shadow Eval runner covers 26 accepted, unsafe, and invalid model-output cases without requiring a real API key.
+- `scripts\accept.ps1` can optionally run a real DeepSeek shadow smoke check and record provider/model/prompt/schema/latency/fallback evidence.
 - No real enterprise system integration.
 
 ## Implemented MVP Scenarios
@@ -108,6 +109,14 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts\
 
 The acceptance script runs `mvn test`, scans for committed key-shaped secrets, reads the mock shadow Eval JSON, and writes `target/agent-eval/acceptance-report.md`.
 
+Run the same gate with optional live DeepSeek smoke cases:
+
+```powershell
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts\accept.ps1 -IncludeLiveDeepSeek
+```
+
+Live smoke stays off by default. With `-IncludeLiveDeepSeek` and no `DEEPSEEK_API_KEY`, the report marks `Live DeepSeek: SKIPPED`. With a key, the script starts the app on a temporary port, calls three smoke cases, records `provider`, `model`, `promptVersion`, `schemaVersion`, per-case latency, risk levels, and fallback reason, then stops the local app process. `userRiskLevel` is the deterministic baseline and `shadowRiskLevel` is the LLM shadow candidate. The key itself is never written to the report.
+
 ## Agent Mode
 
 Default mode is deterministic:
@@ -134,7 +143,7 @@ mvn spring-boot:run "-Dspring-boot.run.profiles=deepseek"
 
 Current shadow behavior is intentionally conservative: deterministic output is still returned to the caller. The DeepSeek result is treated only as a candidate decision and must pass Java-side validation before being recorded as a comparable shadow decision.
 
-Latest live check with the `deepseek` profile started the application and reached the real shadow path. Account-locked and CRM permission-request smoke cases produced valid `LLM_SHADOW` candidate decisions, while the user-facing response still came from the deterministic baseline.
+Shadow trace details include audit fields such as `llm_status`, `fallback_reason`, `fallback_to`, `provider`, `model`, `prompt_version`, `schema_version`, `latency_ms`, `validation_errors`, `final_decision_source`, and `user_visible_changed`. Latest live smoke through `scripts\accept.ps1 -IncludeLiveDeepSeek` reached the real shadow path while the user-facing response still came from the deterministic baseline.
 
 ## Database
 
@@ -183,8 +192,8 @@ Each request persists the ticket and execution evidence to `ticket`, `agent_trac
 The next phase keeps the deterministic baseline and uses the acceptance report as the review artifact:
 
 1. Send the latest sync package and acceptance report summary for review.
-2. Add optional real DeepSeek live smoke reporting if the mock acceptance gate is considered sufficient.
-3. Expand trace details with explicit fallback reasons where needed.
+2. Add 6 to 8 gap Eval cases for live-shadow edge cases and trace audit expectations.
+3. Keep tuning prompt/schema only inside shadow mode until acceptance metrics are stable.
 4. Promote to `llm` or `hybrid` mode only after shadow Eval cases and review show stable behavior.
 
 DeepSeek keys must be supplied through environment variables, never committed.

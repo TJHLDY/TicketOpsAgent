@@ -26,12 +26,21 @@ import java.util.stream.Collectors;
 @Service
 public class AgentOrchestrator {
 
+    private static final String DEFAULT_LLM_PROVIDER = "deepseek";
+    private static final String DEFAULT_LLM_MODEL = "deepseek-v4-flash";
+    private static final String DEFAULT_PROMPT_VERSION = "deepseek-shadow-v2";
+    private static final String DEFAULT_SCHEMA_VERSION = "agent-decision-v1";
+
     private final SopSearchService sopSearchService;
     private final MockAccountStatusTool accountStatusTool;
     private final MockUserPermissionsTool permissionsTool;
     private final AgentMode agentMode;
     private final AgentDecisionPort decisionPort;
     private final AgentDecisionPort shadowDecisionPort;
+    private final String llmProvider;
+    private final String llmModel;
+    private final String promptVersion;
+    private final String schemaVersion;
 
     @Autowired
     public AgentOrchestrator(
@@ -39,6 +48,10 @@ public class AgentOrchestrator {
             MockAccountStatusTool accountStatusTool,
             MockUserPermissionsTool permissionsTool,
             @Value("${ticketops.agent.mode:deterministic}") String agentModeValue,
+            @Value("${ticketops.agent.llm.provider:deepseek}") String llmProvider,
+            @Value("${ticketops.agent.llm.model:deepseek-v4-flash}") String llmModel,
+            @Value("${ticketops.agent.llm.prompt-version:deepseek-shadow-v2}") String promptVersion,
+            @Value("${ticketops.agent.llm.schema-version:agent-decision-v1}") String schemaVersion,
             ObjectProvider<DeepSeekLlmAgentDecisionService> shadowDecisionPortProvider
     ) {
         this(
@@ -47,7 +60,11 @@ public class AgentOrchestrator {
                 shadowDecisionPortProvider.getIfAvailable(),
                 sopSearchService,
                 accountStatusTool,
-                permissionsTool
+                permissionsTool,
+                llmProvider,
+                llmModel,
+                promptVersion,
+                schemaVersion
         );
     }
 
@@ -57,7 +74,11 @@ public class AgentOrchestrator {
             AgentDecisionPort shadowDecisionPort,
             SopSearchService sopSearchService,
             MockAccountStatusTool accountStatusTool,
-            MockUserPermissionsTool permissionsTool
+            MockUserPermissionsTool permissionsTool,
+            String llmProvider,
+            String llmModel,
+            String promptVersion,
+            String schemaVersion
     ) {
         this.sopSearchService = sopSearchService;
         this.accountStatusTool = accountStatusTool;
@@ -65,6 +86,10 @@ public class AgentOrchestrator {
         this.agentMode = agentMode;
         this.decisionPort = decisionPort;
         this.shadowDecisionPort = shadowDecisionPort;
+        this.llmProvider = llmProvider;
+        this.llmModel = llmModel;
+        this.promptVersion = promptVersion;
+        this.schemaVersion = schemaVersion;
     }
 
     public static AgentOrchestrator createDefault() {
@@ -74,7 +99,11 @@ public class AgentOrchestrator {
                 null,
                 new SopSearchService(),
                 new MockAccountStatusTool(),
-                new MockUserPermissionsTool()
+                new MockUserPermissionsTool(),
+                DEFAULT_LLM_PROVIDER,
+                DEFAULT_LLM_MODEL,
+                DEFAULT_PROMPT_VERSION,
+                DEFAULT_SCHEMA_VERSION
         );
     }
 
@@ -91,7 +120,11 @@ public class AgentOrchestrator {
                 shadowDecisionPort,
                 sopSearchService,
                 accountStatusTool,
-                permissionsTool
+                permissionsTool,
+                DEFAULT_LLM_PROVIDER,
+                DEFAULT_LLM_MODEL,
+                DEFAULT_PROMPT_VERSION,
+                DEFAULT_SCHEMA_VERSION
         );
     }
 
@@ -260,7 +293,7 @@ public class AgentOrchestrator {
         return "OA";
     }
 
-    private TraceEvent shadowTraceEvent(AgentDecision shadowDecision) {
+    private TraceEvent shadowTraceEvent(AgentDecision shadowDecision, long latencyMs) {
         String toolIntents = shadowDecision.toolIntents().stream()
                 .map(intent -> intent.toolName())
                 .collect(Collectors.joining(","));
@@ -274,6 +307,11 @@ public class AgentOrchestrator {
                         + ", risk=" + shadowDecision.riskLevel()
                         + ", confidence=" + shadowDecision.confidence()
                         + ", toolIntents=" + toolIntents
+                        + ", llm_status=ACCEPTED"
+                        + ", fallback_reason=none"
+                        + ", fallback_to=none"
+                        + shadowAuditDetail(latencyMs)
+                        + ", validation_errors=none"
         );
     }
 
@@ -281,13 +319,18 @@ public class AgentOrchestrator {
         if (shadowDecisionPort == null) {
             return skippedShadowTraceEvent();
         }
+        long startedAt = System.nanoTime();
         try {
-            return shadowTraceEvent(shadowDecisionPort.decide(context));
+            return shadowTraceEvent(shadowDecisionPort.decide(context), elapsedMillis(startedAt));
         } catch (LlmDecisionException exception) {
-            return failedShadowTraceEvent(exception.status());
+            return failedShadowTraceEvent(exception.status(), elapsedMillis(startedAt));
         } catch (RuntimeException exception) {
-            return failedShadowTraceEvent("API_ERROR");
+            return failedShadowTraceEvent("API_ERROR", elapsedMillis(startedAt));
         }
+    }
+
+    private long elapsedMillis(long startedAt) {
+        return Math.max(0, (System.nanoTime() - startedAt) / 1_000_000);
     }
 
     private static AgentMode parseAgentMode(String agentModeValue) {
@@ -301,10 +344,24 @@ public class AgentOrchestrator {
         );
     }
 
-    private TraceEvent failedShadowTraceEvent(String llmStatus) {
+    private TraceEvent failedShadowTraceEvent(String llmStatus, long latencyMs) {
         return new TraceEvent(
                 "LLM_SHADOW_FAILED",
-                "llm_status=" + llmStatus + ", fallback_to=DETERMINISTIC"
+                "llm_status=" + llmStatus
+                        + ", fallback_reason=" + llmStatus
+                        + ", fallback_to=DETERMINISTIC"
+                        + shadowAuditDetail(latencyMs)
+                        + ", validation_errors=" + llmStatus
         );
+    }
+
+    private String shadowAuditDetail(long latencyMs) {
+        return ", provider=" + llmProvider
+                + ", model=" + llmModel
+                + ", prompt_version=" + promptVersion
+                + ", schema_version=" + schemaVersion
+                + ", latency_ms=" + latencyMs
+                + ", final_decision_source=DETERMINISTIC"
+                + ", user_visible_changed=false";
     }
 }

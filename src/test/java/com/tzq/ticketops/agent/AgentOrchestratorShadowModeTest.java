@@ -59,6 +59,17 @@ class AgentOrchestratorShadowModeTest {
                 .anySatisfy(detail -> assertThat(detail)
                         .contains("category=LOGIN_FAILED")
                         .contains("confidence=0.61")
-                        .contains("toolIntents=unexpectedTool"));
+                        .contains("toolIntents=unexpectedTool")
+                        .contains("llm_status=ACCEPTED")
+                        .contains("fallback_reason=none")
+                        .contains("fallback_to=none")
+                        .contains("provider=deepseek")
+                        .contains("model=deepseek-v4-flash")
+                        .contains("prompt_version=deepseek-shadow-v2")
+                        .contains("schema_version=agent-decision-v1")
+                        .contains("final_decision_source=DETERMINISTIC")
+                        .contains("user_visible_changed=false")
+                        .contains("validation_errors=none")
+                        .contains("latency_ms="));
     }
 }

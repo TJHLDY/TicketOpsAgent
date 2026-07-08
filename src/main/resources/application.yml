@@ -18,3 +18,7 @@ ticketops:
     mode: deterministic
     llm:
       enabled: false
+      provider: deepseek
+      model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
+      prompt-version: deepseek-shadow-v2
+      schema-version: agent-decision-v1

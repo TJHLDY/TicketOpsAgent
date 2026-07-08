@@ -42,6 +42,15 @@ class AgentOrchestratorShadowFailureTest {
         assertThat(response.traceEvents()).extracting(TraceEvent::detail)
                 .anySatisfy(detail -> assertThat(detail)
                         .contains("llm_status=PARSE_ERROR")
-                        .contains("fallback_to=DETERMINISTIC"));
+                        .contains("fallback_reason=PARSE_ERROR")
+                        .contains("fallback_to=DETERMINISTIC")
+                        .contains("provider=deepseek")
+                        .contains("model=deepseek-v4-flash")
+                        .contains("prompt_version=deepseek-shadow-v2")
+                        .contains("schema_version=agent-decision-v1")
+                        .contains("final_decision_source=DETERMINISTIC")
+                        .contains("user_visible_changed=false")
+                        .contains("validation_errors=PARSE_ERROR")
+                        .contains("latency_ms="));
     }
 }
