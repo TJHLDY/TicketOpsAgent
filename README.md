@@ -18,12 +18,13 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 1.1.8 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 46 automated tests passing at the latest verification.
+- 51 automated tests passing at the latest verification.
 - `AgentDecisionPort` boundary in place with deterministic routing plus DeepSeek shadow evaluation.
 - DeepSeek shadow mode calls the model, parses a candidate `AgentDecision`, validates enums/tools/pending actions/confidence, and falls back to deterministic output on validation/API errors.
 - Mock LLM shadow Eval runner covers 34 accepted, unsafe, invalid model-output, tool-argument, and pending-action mismatch cases without requiring a real API key.
 - `scripts\accept.ps1` can optionally run a real DeepSeek shadow smoke check and record provider/model/prompt/schema/latency/fallback evidence.
 - DeepSeek shadow evaluation is phase-closed for this spike: evaluable, rollback-safe, and reproducible enough for review and resume/interview material.
+- Backend API productization is in progress on `codex/backend-api-productization`: ticket detail/list, trace/tool call reads, pending action review, and eval report reads.
 - No real enterprise system integration.
 
 ## Implemented MVP Scenarios
@@ -195,14 +196,42 @@ Invoke-RestMethod -Method Post http://localhost:8080/api/agent/chat `
 
 Each request persists the ticket and execution evidence to `ticket`, `agent_trace`, `tool_call_log`, and `pending_action`.
 
+### Backend Audit APIs
+
+After creating a ticket through `/api/agent/chat`, use the ticket id from the database or ticket list API to inspect the execution evidence:
+
+```powershell
+Invoke-RestMethod http://localhost:8080/api/tickets
+Invoke-RestMethod http://localhost:8080/api/tickets/{ticketId}
+Invoke-RestMethod http://localhost:8080/api/tickets/{ticketId}/trace
+Invoke-RestMethod http://localhost:8080/api/tickets/{ticketId}/tool-calls
+Invoke-RestMethod http://localhost:8080/api/tickets/{ticketId}/pending-actions
+Invoke-RestMethod http://localhost:8080/api/eval/reports/latest
+```
+
+Pending action review is audit-only and does not execute real account or permission changes:
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8080/api/pending-actions/{actionId}/approve `
+  -ContentType 'application/json' `
+  -Body '{"reviewerId":"admin-mock","reviewComment":"Approved for audit demo"}'
+
+Invoke-RestMethod -Method Post http://localhost:8080/api/pending-actions/{actionId}/reject `
+  -ContentType 'application/json' `
+  -Body '{"reviewerId":"admin-mock","reviewComment":"Rejected for audit demo"}'
+```
+
+The review response always keeps `executionStatus` at `NOT_EXECUTED_MOCK_ONLY`.
+
 ## Planned Next Phase
 
-The DeepSeek shadow stage is closed for this spike. The next phase should not add feature scope by default. Keep the deterministic baseline and use the acceptance report as the review artifact.
+The current backend phase focuses on API productization, not new AI scope.
 
 Recommended next work:
 
-1. Prepare resume and interview material from the verified shadow evidence.
-2. Merge or tag the current shadow-eval state after acceptance remains green.
-3. Only consider `hybrid`, `llm`, pgvector, frontend, or real enterprise integrations in a separate phase with a new acceptance plan.
+1. Keep backend API productization small: ticket query, trace/tool call query, pending action review, eval report query.
+2. Run `scripts\accept.ps1` after each backend API checkpoint.
+3. Build the frontend only after these read/review APIs are stable.
+4. Only consider `hybrid`, `llm`, pgvector, or real enterprise integrations in a separate phase with a new acceptance plan.
 
 DeepSeek keys must be supplied through environment variables, never committed.

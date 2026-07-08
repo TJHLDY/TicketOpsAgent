@@ -12,6 +12,10 @@ Chinese version:
 
 ## Resume-safe Bullet
 
+Current version after backend API productization:
+
+> 基于 Spring Boot + Spring AI 构建企业 IT 账号与权限工单后端 Agent 原型，跑通工单创建、分类定级、SOP 检索、只读工具调用、回复草稿、pending action 与 trace 日志；接入 DeepSeek shadow evaluator，实现 LLM 候选决策的 DTO 解析、Java 白名单校验、fallback reason、trace audit、34 条 mock shadow eval 与 optional live smoke；进一步设计 ticket / trace / tool call / pending action / eval report 查询 API 和 pending action 人工确认接口，使 Agent 决策链路具备可查询、可审计、可回滚的后端服务化能力。
+
 Long version:
 
 > 基于 Spring Boot + Spring AI 构建企业 IT 工单 Agent 后端原型，跑通工单分类定级、SOP 检索、只读账号/权限查询、回复草稿、pending action 与 trace 日志；接入 DeepSeek shadow candidate 机制，实现 LLM 输出 DTO 解析、Java 白名单校验、deterministic fallback、trace audit 与一键 acceptance report，覆盖 34 条 mock shadow eval、9 条安全用例、fallback reason 统计，并支持可选 live DeepSeek smoke 验证真实模型接入。
@@ -74,6 +78,7 @@ Keyword/table SOP retrieval over pgvector:
 - No LDAP, SSO, OA, IAM, or approval workflow integration.
 - No automatic unlock, reset password, permission grant, dispatch, or ticket close.
 - Write-like operations are represented only as pending actions.
+- Pending action approve/reject only updates local audit state with `NOT_EXECUTED_MOCK_ONLY`.
 - DeepSeek output remains shadow-only.
 - API keys are supplied through environment variables and are not written to reports or docs.
 
@@ -113,3 +118,4 @@ A new phase plan, more realistic eval data, stable prompt/schema behavior, stron
 - Real pgvector RAG.
 - LLM main decision chain.
 - Model accuracy reached a specific percentage.
+- Complete frontend/backend system.
