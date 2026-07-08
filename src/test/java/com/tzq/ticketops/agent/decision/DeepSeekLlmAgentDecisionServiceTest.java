@@ -6,6 +6,8 @@ import com.tzq.ticketops.agent.TicketCategory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -50,6 +52,52 @@ class DeepSeekLlmAgentDecisionServiceTest {
         assertThatThrownBy(() -> service.decide(new AgentContext("u1", "title", "description")))
                 .isInstanceOf(LlmDecisionException.class)
                 .hasMessageContaining("NO_LLM_GATEWAY");
+    }
+
+    @Test
+    void promptContainsStrictSchemaAndGoldenExamplesForPendingActions() {
+        AtomicReference<String> capturedPrompt = new AtomicReference<>();
+        DeepSeekLlmAgentDecisionService service = new DeepSeekLlmAgentDecisionService(
+                fixedProvider(prompt -> {
+                    capturedPrompt.set(prompt);
+                    return """
+                            {
+                              "category": "ACCOUNT_LOCKED",
+                              "priority": "P2",
+                              "riskLevel": "NEEDS_APPROVAL",
+                              "confidence": 0.91,
+                              "sopQuery": "account locked SOP",
+                              "toolIntents": [],
+                              "pendingActions": [
+                                {
+                                  "actionType": "UNLOCK_ACCOUNT",
+                                  "requiresApproval": true
+                                }
+                              ],
+                              "internalSuggestion": "Submit unlock request.",
+                              "userReplyDraft": "Your account appears locked.",
+                              "reasonCode": "ACCOUNT_LOCKED_SIGNAL"
+                            }
+                            """;
+                }),
+                new LlmAgentDecisionParser(new ObjectMapper())
+        );
+
+        service.decide(new AgentContext(
+                "mock-user-001",
+                "OA login failed",
+                "I cannot log in to OA. It says my account is locked."
+        ));
+
+        assertThat(capturedPrompt.get())
+                .contains("\"pendingActions\": [")
+                .contains("\"actionType\": \"UNLOCK_ACCOUNT\"")
+                .contains("\"actionType\": \"GRANT_PERMISSION\"")
+                .contains("\"requiresApproval\": true")
+                .contains("For READ_ONLY or REJECT riskLevel, pendingActions must be []")
+                .contains("Golden example: account locked")
+                .contains("Golden example: permission request")
+                .contains("Do not use actionType values such as unlock, resetPassword, closeTicket, or grantPermissionNow.");
     }
 
     private static ObjectProvider<DeepSeekChatGateway> fixedProvider(DeepSeekChatGateway gateway) {

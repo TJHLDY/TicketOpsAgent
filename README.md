@@ -18,7 +18,7 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 1.1.8 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 39 automated tests passing at the latest verification.
+- 41 automated tests passing at the latest verification.
 - `AgentDecisionPort` boundary in place with deterministic routing plus DeepSeek shadow evaluation.
 - DeepSeek shadow mode calls the model, parses a candidate `AgentDecision`, validates enums/tools/pending actions/confidence, and falls back to deterministic output on validation/API errors.
 - No real enterprise system integration.
@@ -110,7 +110,7 @@ mvn spring-boot:run "-Dspring-boot.run.profiles=deepseek"
 
 Current shadow behavior is intentionally conservative: deterministic output is still returned to the caller. The DeepSeek result is treated only as a candidate decision and must pass Java-side validation before being recorded as a comparable shadow decision.
 
-Latest live check with the `deepseek` profile started the application and reached the real shadow path. The model candidate was rejected with `llm_status=INVALID_PENDING_ACTION`, and the response fell back to deterministic output, which is the expected safety behavior for this phase.
+Latest live check with the `deepseek` profile started the application and reached the real shadow path. Account-locked and CRM permission-request smoke cases produced valid `LLM_SHADOW` candidate decisions, while the user-facing response still came from the deterministic baseline.
 
 ## Database
 
@@ -158,8 +158,8 @@ Each request persists the ticket and execution evidence to `ticket`, `agent_trac
 
 The next phase keeps the deterministic baseline and makes shadow evaluation more useful:
 
-1. Tune the DeepSeek prompt/schema so valid account-lock and permission candidates pass validation.
-2. Add focused LLM Eval cases for accepted decisions, parser failures, unauthorized tools, unsafe pending actions, and fallback traces.
+1. Add focused LLM Eval cases for accepted decisions, parser failures, unauthorized tools, unsafe pending actions, and fallback traces.
+2. Generate a one-command acceptance report for build/test status, secret scan, shadow Eval metrics, and known limits.
 3. Expand trace details with explicit fallback reasons where needed.
 4. Promote to `llm` or `hybrid` mode only after shadow Eval cases show stable behavior.
 

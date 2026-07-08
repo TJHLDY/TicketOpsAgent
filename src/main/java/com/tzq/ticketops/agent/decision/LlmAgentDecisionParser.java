@@ -116,6 +116,9 @@ public class LlmAgentDecisionParser {
         if (riskLevel == RiskLevel.READ_ONLY) {
             throw new LlmDecisionException("READ_ONLY_WITH_PENDING_ACTION", actionType.name());
         }
+        if (riskLevel == RiskLevel.REJECT) {
+            throw new LlmDecisionException("REJECT_WITH_PENDING_ACTION", actionType.name());
+        }
         return new PendingActionProposal(actionType, true);
     }
 

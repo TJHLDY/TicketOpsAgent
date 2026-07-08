@@ -111,6 +111,30 @@ class LlmAgentDecisionParserTest {
     }
 
     @Test
+    void rejectsRejectedRiskWithPendingAction() {
+        String json = """
+                {
+                  "category": "UNKNOWN",
+                  "priority": "P3",
+                  "riskLevel": "REJECT",
+                  "confidence": 0.86,
+                  "toolIntents": [],
+                  "pendingActions": [
+                    {
+                      "actionType": "GRANT_PERMISSION",
+                      "requiresApproval": true
+                    }
+                  ],
+                  "reasonCode": "UNSAFE_REJECT_WRITE"
+                }
+                """;
+
+        assertThatThrownBy(() -> parser.parse(json))
+                .isInstanceOf(LlmDecisionException.class)
+                .hasMessageContaining("REJECT_WITH_PENDING_ACTION");
+    }
+
+    @Test
     void wrapsMalformedJsonAsParseError() {
         assertThatThrownBy(() -> parser.parse("{not-json"))
                 .isInstanceOf(LlmDecisionException.class)
