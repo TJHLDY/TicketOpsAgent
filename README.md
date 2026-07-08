@@ -80,6 +80,7 @@ Expected chain:
 
 - [Acceptance review](docs/eval/acceptance-review.md): commands and expected gates for the current shadow acceptance report.
 - [DeepSeek shadow stage summary](docs/eval/deepseek-shadow-stage-summary.md): phase-close evidence, metrics, boundaries, and non-goals.
+- [Backend API productization guide](docs/api/backend-api-productization.md): local demo flow for ticket, trace, tool call, pending action review, and eval report APIs.
 - [Interview notes](docs/interview/ticketops-interview-notes.md): resume-safe wording, STAR story, trade-offs, and likely interviewer questions.
 
 ## Run Tests
@@ -224,6 +225,12 @@ Invoke-RestMethod -Method Post http://localhost:8080/api/pending-actions/{action
 ```
 
 The review response always keeps `executionStatus` at `NOT_EXECUTED_MOCK_ONLY`.
+
+Run the end-to-end backend API demo script:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\demo-backend-api.ps1
+```
 
 ## Planned Next Phase
 
