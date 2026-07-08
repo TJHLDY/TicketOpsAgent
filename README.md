@@ -1,6 +1,8 @@
 # TicketOpsAgent
 
-TicketOpsAgent is a Spring Boot + Spring AI backend spike for enterprise IT account and permission tickets.
+A Spring Boot + Spring AI backend prototype for enterprise IT account and permission tickets.
+
+The project demonstrates deterministic ticket triage, SOP retrieval, read-only tool calls, pending action review, audit traces, and DeepSeek shadow candidate evaluation with Java-side DTO parsing, validation, fallback, and acceptance reporting.
 
 The current MVP verifies a controllable backend agent chain:
 
@@ -18,7 +20,7 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 1.1.8 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 51 automated tests passing at the latest verification.
+- 53 automated tests passing at the latest verification.
 - `AgentDecisionPort` boundary in place with deterministic routing plus DeepSeek shadow evaluation.
 - DeepSeek shadow mode calls the model, parses a candidate `AgentDecision`, validates enums/tools/pending actions/confidence, and falls back to deterministic output on validation/API errors.
 - Mock LLM shadow Eval runner covers 34 accepted, unsafe, invalid model-output, tool-argument, and pending-action mismatch cases without requiring a real API key.
@@ -75,6 +77,84 @@ Expected chain:
 - `ticketops.agent.mode=shadow` keeps deterministic user-facing output and records shadow decision traces.
 - The `deepseek` profile enables a Spring AI-backed shadow decision service. Invalid or unsafe model output is recorded as `LLM_SHADOW_FAILED` and does not affect the user-facing response.
 - Current SOP retrieval is keyword/table driven, not vector RAG.
+
+## Quick Start
+
+Run the test suite and acceptance gate:
+
+```powershell
+mvn test
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts\accept.ps1
+```
+
+Start the app and run the backend API demo:
+
+```powershell
+mvn spring-boot:run
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\demo-backend-api.ps1 -BaseUrl http://localhost:8080
+```
+
+Optional DeepSeek live smoke:
+
+```powershell
+$env:DEEPSEEK_API_KEY="<your key>"
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts\accept.ps1 -SkipMavenTest -IncludeLiveDeepSeek
+```
+
+Do not commit API keys. DeepSeek keys must be supplied through environment variables only.
+
+## Architecture Overview
+
+```text
+/api/agent/chat
+      |
+      v
+Deterministic Decision Service  ---> user-facing response
+      |
+      +--> SOP Retrieval
+      +--> Read-only Tools
+      +--> Pending Action Proposal
+      +--> Trace / Tool Log / Pending Action
+      |
+      +--> DeepSeek Shadow Candidate
+              |
+              v
+        DTO / Parser / Validator
+              |
+        LLM_SHADOW or LLM_SHADOW_FAILED
+              |
+        fallback deterministic
+```
+
+The deterministic path remains the user-facing main flow. The DeepSeek path is a shadow candidate path used for comparison, traceability, and evaluation.
+
+## Validation Evidence
+
+Latest local validation:
+
+- `mvn test`: 53 tests PASS
+- `scripts\accept.ps1`: PASS
+- Secret scan: PASS
+- Shadow eval: 34 cases
+- Safety cases: 9/9
+- Trace audit: 34/34
+- User-visible changed count: 0
+- Optional live smoke: supported
+
+## What This Project Does Not Claim
+
+This repository is not a production AI Agent or production ITSM system. It does not claim:
+
+- real enterprise system integration
+- LDAP / SSO / IAM / OA integration
+- real account unlock
+- real password reset
+- real permission grant
+- real dispatch or close-ticket operation
+- LLM main decisioning
+- LLM-driven real tool execution
+- production RAG / pgvector
+- production approval workflow
 
 ## Documentation
 
