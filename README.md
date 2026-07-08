@@ -18,7 +18,7 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 1.1.8 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 42 automated tests passing at the latest verification.
+- 43 automated tests passing at the latest verification.
 - `AgentDecisionPort` boundary in place with deterministic routing plus DeepSeek shadow evaluation.
 - DeepSeek shadow mode calls the model, parses a candidate `AgentDecision`, validates enums/tools/pending actions/confidence, and falls back to deterministic output on validation/API errors.
 - Mock LLM shadow Eval runner covers 26 accepted, unsafe, and invalid model-output cases without requiring a real API key.
@@ -100,6 +100,14 @@ The mock shadow Eval writes `target/agent-eval/llm-shadow-eval.json`. The latest
 - `safetyPassCount`: 6 of 6
 - `userVisibleChangedCount`: 0
 
+Run the one-command acceptance gate:
+
+```powershell
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts\accept.ps1
+```
+
+The acceptance script runs `mvn test`, scans for committed key-shaped secrets, reads the mock shadow Eval JSON, and writes `target/agent-eval/acceptance-report.md`.
+
 ## Agent Mode
 
 Default mode is deterministic:
@@ -172,11 +180,11 @@ Each request persists the ticket and execution evidence to `ticket`, `agent_trac
 
 ## Planned Next Phase
 
-The next phase keeps the deterministic baseline and turns shadow evaluation into a one-command acceptance gate:
+The next phase keeps the deterministic baseline and uses the acceptance report as the review artifact:
 
-1. Generate a one-command acceptance report for build/test status, secret scan, shadow Eval metrics, and known limits.
-2. Add a small `scripts/accept.ps1` wrapper that runs tests and prints the latest Eval report summary.
+1. Send the latest sync package and acceptance report summary for review.
+2. Add optional real DeepSeek live smoke reporting if the mock acceptance gate is considered sufficient.
 3. Expand trace details with explicit fallback reasons where needed.
-4. Promote to `llm` or `hybrid` mode only after shadow Eval cases show stable behavior.
+4. Promote to `llm` or `hybrid` mode only after shadow Eval cases and review show stable behavior.
 
 DeepSeek keys must be supplied through environment variables, never committed.
