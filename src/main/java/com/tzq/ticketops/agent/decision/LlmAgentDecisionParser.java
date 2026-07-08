@@ -46,7 +46,7 @@ public class LlmAgentDecisionParser {
         RiskLevel riskLevel = parseEnum(RiskLevel.class, dto.riskLevel(), "INVALID_RISK_LEVEL");
         double confidence = validateConfidence(dto.confidence());
         List<ToolIntent> toolIntents = validateTools(dto.toolIntents());
-        PendingActionProposal pendingActionProposal = validatePendingAction(dto.pendingActions(), riskLevel);
+        PendingActionProposal pendingActionProposal = validatePendingAction(dto.pendingActions(), category, riskLevel);
 
         return new AgentDecision(
                 category,
@@ -86,10 +86,11 @@ public class LlmAgentDecisionParser {
         }
         List<ToolIntent> toolIntents = new ArrayList<>();
         for (LlmToolIntentDto toolDto : toolDtos) {
-            if (toolDto.toolName() == null || !ALLOWED_TOOLS.contains(toolDto.toolName())) {
-                throw new LlmDecisionException("UNAUTHORIZED_TOOL", String.valueOf(toolDto.toolName()));
+            if (toolDto == null || toolDto.toolName() == null || !ALLOWED_TOOLS.contains(toolDto.toolName())) {
+                throw new LlmDecisionException("UNAUTHORIZED_TOOL", toolDto == null ? "null" : String.valueOf(toolDto.toolName()));
             }
             Map<String, String> arguments = toolDto.arguments() == null ? Map.of() : toolDto.arguments();
+            validateRequiredToolArguments(toolDto.toolName(), arguments);
             if (arguments.containsKey("appCode") && !ALLOWED_APP_CODES.contains(arguments.get("appCode"))) {
                 throw new LlmDecisionException("INVALID_TOOL_ARGUMENT", "unsupported appCode");
             }
@@ -98,7 +99,20 @@ public class LlmAgentDecisionParser {
         return List.copyOf(toolIntents);
     }
 
-    private PendingActionProposal validatePendingAction(List<LlmPendingActionDto> actionDtos, RiskLevel riskLevel) {
+    private void validateRequiredToolArguments(String toolName, Map<String, String> arguments) {
+        if (isBlank(arguments.get("userId"))) {
+            throw new LlmDecisionException("INVALID_TOOL_ARGUMENT", "missing userId");
+        }
+        if ("getUserPermissions".equals(toolName) && isBlank(arguments.get("appCode"))) {
+            throw new LlmDecisionException("INVALID_TOOL_ARGUMENT", "missing appCode");
+        }
+    }
+
+    private PendingActionProposal validatePendingAction(
+            List<LlmPendingActionDto> actionDtos,
+            TicketCategory category,
+            RiskLevel riskLevel
+    ) {
         if (actionDtos == null || actionDtos.isEmpty()) {
             return null;
         }
@@ -106,6 +120,9 @@ public class LlmAgentDecisionParser {
             throw new LlmDecisionException("TOO_MANY_PENDING_ACTIONS", "only one pending action is supported");
         }
         LlmPendingActionDto actionDto = actionDtos.get(0);
+        if (actionDto == null) {
+            throw new LlmDecisionException("INVALID_PENDING_ACTION", "null");
+        }
         PendingActionType actionType = parseEnum(PendingActionType.class, actionDto.actionType(), "INVALID_PENDING_ACTION");
         if (!ALLOWED_PENDING_ACTIONS.contains(actionType)) {
             throw new LlmDecisionException("UNAUTHORIZED_PENDING_ACTION", actionType.name());
@@ -119,7 +136,23 @@ public class LlmAgentDecisionParser {
         if (riskLevel == RiskLevel.REJECT) {
             throw new LlmDecisionException("REJECT_WITH_PENDING_ACTION", actionType.name());
         }
+        validatePendingActionCategory(category, actionType);
         return new PendingActionProposal(actionType, true);
+    }
+
+    private void validatePendingActionCategory(TicketCategory category, PendingActionType actionType) {
+        boolean matches = switch (category) {
+            case ACCOUNT_LOCKED -> actionType == PendingActionType.UNLOCK_ACCOUNT;
+            case PERMISSION_REQUEST -> actionType == PendingActionType.GRANT_PERMISSION;
+            default -> false;
+        };
+        if (!matches) {
+            throw new LlmDecisionException("PENDING_ACTION_CATEGORY_MISMATCH", category + " cannot use " + actionType);
+        }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private String defaultString(String value) {

@@ -87,6 +87,56 @@ class LlmAgentDecisionParserTest {
     }
 
     @Test
+    void rejectsMissingRequiredToolArguments() {
+        String json = """
+                {
+                  "category": "PERMISSION_REQUEST",
+                  "priority": "P3",
+                  "riskLevel": "NEEDS_APPROVAL",
+                  "confidence": 0.82,
+                  "toolIntents": [
+                    {
+                      "toolName": "getUserPermissions",
+                      "arguments": {
+                        "userId": "mock-user-005"
+                      }
+                    }
+                  ],
+                  "pendingActions": [],
+                  "reasonCode": "MISSING_APP_CODE"
+                }
+                """;
+
+        assertThatThrownBy(() -> parser.parse(json))
+                .isInstanceOf(LlmDecisionException.class)
+                .hasMessageContaining("INVALID_TOOL_ARGUMENT");
+    }
+
+    @Test
+    void rejectsPendingActionThatDoesNotMatchCategory() {
+        String json = """
+                {
+                  "category": "PERMISSION_REQUEST",
+                  "priority": "P3",
+                  "riskLevel": "NEEDS_APPROVAL",
+                  "confidence": 0.84,
+                  "toolIntents": [],
+                  "pendingActions": [
+                    {
+                      "actionType": "UNLOCK_ACCOUNT",
+                      "requiresApproval": true
+                    }
+                  ],
+                  "reasonCode": "WRONG_ACTION_FOR_CATEGORY"
+                }
+                """;
+
+        assertThatThrownBy(() -> parser.parse(json))
+                .isInstanceOf(LlmDecisionException.class)
+                .hasMessageContaining("PENDING_ACTION_CATEGORY_MISMATCH");
+    }
+
+    @Test
     void rejectsWriteActionWithoutApproval() {
         String json = """
                 {

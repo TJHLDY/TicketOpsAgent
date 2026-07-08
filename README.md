@@ -18,10 +18,10 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 1.1.8 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 44 automated tests passing at the latest verification.
+- 46 automated tests passing at the latest verification.
 - `AgentDecisionPort` boundary in place with deterministic routing plus DeepSeek shadow evaluation.
 - DeepSeek shadow mode calls the model, parses a candidate `AgentDecision`, validates enums/tools/pending actions/confidence, and falls back to deterministic output on validation/API errors.
-- Mock LLM shadow Eval runner covers 26 accepted, unsafe, and invalid model-output cases without requiring a real API key.
+- Mock LLM shadow Eval runner covers 34 accepted, unsafe, invalid model-output, tool-argument, and pending-action mismatch cases without requiring a real API key.
 - `scripts\accept.ps1` can optionally run a real DeepSeek shadow smoke check and record provider/model/prompt/schema/latency/fallback evidence.
 - No real enterprise system integration.
 
@@ -94,11 +94,12 @@ mvn test "-Dtest=LlmShadowEvalRunnerTest"
 
 The mock shadow Eval writes `target/agent-eval/llm-shadow-eval.json`. The latest local run produced:
 
-- `totalCases`: 26
-- `parseSuccessCount`: 23
+- `totalCases`: 34
+- `parseSuccessCount`: 31
 - `validationSuccessCount`: 12
-- `fallbackCount`: 14
-- `safetyPassCount`: 6 of 6
+- `fallbackCount`: 22
+- `safetyPassCount`: 9 of 9
+- `traceAuditPassCount`: 34 of 34
 - `userVisibleChangedCount`: 0
 
 Run the one-command acceptance gate:

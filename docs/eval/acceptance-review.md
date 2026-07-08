@@ -44,7 +44,9 @@ The mock LLM shadow eval currently covers:
 - parse failures
 - empty response
 - unauthorized tool
+- missing required tool arguments
 - invalid or unauthorized pending action
+- pending action and category mismatch
 - write action without approval
 - invalid confidence, app code, category, and risk level
 
@@ -67,6 +69,8 @@ Shadow trace details should carry audit fields for review:
 - `validation_errors`
 - `final_decision_source`
 - `user_visible_changed`
+
+The acceptance report also summarizes `traceAuditPassCount` so each mock shadow case proves these audit fields are present.
 
 ## Review packet
 
