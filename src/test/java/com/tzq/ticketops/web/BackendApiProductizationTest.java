@@ -110,7 +110,7 @@ class BackendApiProductizationTest {
     }
 
     @Test
-    void pendingActionReviewChangesOnlyLocalAuditStatus() throws Exception {
+    void approvePendingActionDoesNotExecuteRealOperation() throws Exception {
         String ticketId = createAccountLockedTicket();
         long actionId = firstPendingActionId(ticketId);
 
@@ -130,6 +130,13 @@ class BackendApiProductizationTest {
                 .andExpect(jsonPath("$.reviewerId").value("admin-mock"))
                 .andExpect(jsonPath("$.executionStatus").value("NOT_EXECUTED_MOCK_ONLY"))
                 .andExpect(jsonPath("$.message").value("Action approved for audit demo only. No real account operation was executed."));
+
+        String accountStatus = jdbcTemplate.queryForObject(
+                "select account_status from mock_user_account where user_id = ?",
+                String.class,
+                "mock-user-001"
+        );
+        assertThat(accountStatus).isEqualTo("LOCKED");
 
         mockMvc.perform(post("/api/pending-actions/{actionId}/approve", actionId)
                         .contentType(MediaType.APPLICATION_JSON)

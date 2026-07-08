@@ -24,7 +24,7 @@ The current MVP verifies a controllable backend agent chain:
 - Mock LLM shadow Eval runner covers 34 accepted, unsafe, invalid model-output, tool-argument, and pending-action mismatch cases without requiring a real API key.
 - `scripts\accept.ps1` can optionally run a real DeepSeek shadow smoke check and record provider/model/prompt/schema/latency/fallback evidence.
 - DeepSeek shadow evaluation is phase-closed for this spike: evaluable, rollback-safe, and reproducible enough for review and resume/interview material.
-- Backend API productization is in progress on `codex/backend-api-productization`: ticket detail/list, trace/tool call reads, pending action review, and eval report reads.
+- Backend API productization is implemented on `codex/backend-api-productization`: ticket detail/list, trace/tool call reads, pending action review, and eval report reads.
 - No real enterprise system integration.
 
 ## Implemented MVP Scenarios
@@ -208,6 +208,8 @@ Invoke-RestMethod http://localhost:8080/api/tickets/{ticketId}/tool-calls
 Invoke-RestMethod http://localhost:8080/api/tickets/{ticketId}/pending-actions
 Invoke-RestMethod http://localhost:8080/api/eval/reports/latest
 ```
+
+The eval report endpoint is for local demo and development review only. It is not a production monitoring API.
 
 Pending action review is audit-only and does not execute real account or permission changes:
 
