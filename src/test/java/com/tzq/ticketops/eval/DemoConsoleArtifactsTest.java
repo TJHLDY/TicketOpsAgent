@@ -37,7 +37,8 @@ class DemoConsoleArtifactsTest {
                 .contains("User-facing result is produced by the deterministic main flow.")
                 .contains("It does not execute real enterprise operations.")
                 .contains("Approve Review")
-                .contains("Reject Review");
+                .contains("Reject Review")
+                .contains("Approve Review / Reject Review never unlock accounts, reset passwords, grant permissions, dispatch tickets, or close tickets.");
 
         assertThat(js)
                 .contains("/api/agent/chat")
