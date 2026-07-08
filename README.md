@@ -1,6 +1,6 @@
 # TicketOpsAgent
 
-TicketOpsAgent is a Spring Boot + Spring AI-ready backend spike for enterprise IT account and permission tickets.
+TicketOpsAgent is a Spring Boot + Spring AI backend spike for enterprise IT account and permission tickets.
 
 The current MVP verifies a controllable backend agent chain:
 
@@ -15,11 +15,12 @@ The current MVP verifies a controllable backend agent chain:
 ## Current Status
 
 - Spring Boot 3.5.15.
-- Spring AI 1.1.8 BOM, with ChatClient integration prepared for the next phase.
+- Spring AI 1.1.8 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 32 automated tests passing at the latest verification.
-- `AgentDecisionPort` boundary in place with deterministic and shadow-mode scaffolding.
+- 39 automated tests passing at the latest verification.
+- `AgentDecisionPort` boundary in place with deterministic routing plus DeepSeek shadow evaluation.
+- DeepSeek shadow mode calls the model, parses a candidate `AgentDecision`, validates enums/tools/pending actions/confidence, and falls back to deterministic output on validation/API errors.
 - No real enterprise system integration.
 
 ## Implemented MVP Scenarios
@@ -67,7 +68,8 @@ Expected chain:
 - Does not execute unlock, reset password, grant permission, or close-ticket operations.
 - Write operations are represented only as `pending_action` rows.
 - Default agent routing is deterministic.
-- `ticketops.agent.mode=shadow` keeps deterministic user-facing output and records shadow decision traces. If no LLM decision port is configured yet, it records `LLM_SHADOW_SKIPPED`.
+- `ticketops.agent.mode=shadow` keeps deterministic user-facing output and records shadow decision traces.
+- The `deepseek` profile enables a Spring AI-backed shadow decision service. Invalid or unsafe model output is recorded as `LLM_SHADOW_FAILED` and does not affect the user-facing response.
 - Current SOP retrieval is keyword/table driven, not vector RAG.
 
 ## Run Tests
@@ -99,7 +101,16 @@ $env:TICKETOPS_AGENT_MODE='shadow'
 mvn spring-boot:run
 ```
 
-Current shadow behavior is intentionally conservative: deterministic output is still returned to the caller. The next implementation step is a DeepSeek-backed `AgentDecisionPort` that writes comparable LLM decisions into trace logs.
+Run with the DeepSeek shadow profile:
+
+```powershell
+$env:DEEPSEEK_API_KEY='<your key>'
+mvn spring-boot:run "-Dspring-boot.run.profiles=deepseek"
+```
+
+Current shadow behavior is intentionally conservative: deterministic output is still returned to the caller. The DeepSeek result is treated only as a candidate decision and must pass Java-side validation before being recorded as a comparable shadow decision.
+
+Latest live check with the `deepseek` profile started the application and reached the real shadow path. The model candidate was rejected with `llm_status=INVALID_PENDING_ACTION`, and the response fell back to deterministic output, which is the expected safety behavior for this phase.
 
 ## Database
 
@@ -145,11 +156,11 @@ Each request persists the ticket and execution evidence to `ticket`, `agent_trac
 
 ## Planned Next Phase
 
-The next phase keeps the deterministic baseline and adds real model support safely:
+The next phase keeps the deterministic baseline and makes shadow evaluation more useful:
 
-1. Add a DeepSeek-backed `AgentDecisionPort` through Spring AI `ChatClient`.
-2. Keep `shadow` mode first: return deterministic results while recording LLM decisions for comparison.
-3. Add fallback fields such as `llm_status`, `fallback_reason`, and `fallback_to` to trace logs.
-4. Promote to `llm` or `hybrid` mode only after Eval cases show stable behavior.
+1. Tune the DeepSeek prompt/schema so valid account-lock and permission candidates pass validation.
+2. Add focused LLM Eval cases for accepted decisions, parser failures, unauthorized tools, unsafe pending actions, and fallback traces.
+3. Expand trace details with explicit fallback reasons where needed.
+4. Promote to `llm` or `hybrid` mode only after shadow Eval cases show stable behavior.
 
 DeepSeek keys must be supplied through environment variables, never committed.

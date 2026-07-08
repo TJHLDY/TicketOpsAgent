@@ -4,13 +4,16 @@ import com.tzq.ticketops.agent.decision.AgentContext;
 import com.tzq.ticketops.agent.decision.AgentDecision;
 import com.tzq.ticketops.agent.decision.AgentDecisionPort;
 import com.tzq.ticketops.agent.decision.AgentMode;
+import com.tzq.ticketops.agent.decision.DeepSeekLlmAgentDecisionService;
 import com.tzq.ticketops.agent.decision.DeterministicAgentDecisionService;
+import com.tzq.ticketops.agent.decision.LlmDecisionException;
 import com.tzq.ticketops.rag.SopSearchService;
 import com.tzq.ticketops.tools.AccountStatusResult;
 import com.tzq.ticketops.tools.MockAccountStatusTool;
 import com.tzq.ticketops.tools.MockUserPermissionsTool;
 import com.tzq.ticketops.tools.UserPermissionsResult;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -35,12 +38,13 @@ public class AgentOrchestrator {
             SopSearchService sopSearchService,
             MockAccountStatusTool accountStatusTool,
             MockUserPermissionsTool permissionsTool,
-            @Value("${ticketops.agent.mode:deterministic}") String agentModeValue
+            @Value("${ticketops.agent.mode:deterministic}") String agentModeValue,
+            ObjectProvider<DeepSeekLlmAgentDecisionService> shadowDecisionPortProvider
     ) {
         this(
                 parseAgentMode(agentModeValue),
                 new DeterministicAgentDecisionService(),
-                null,
+                shadowDecisionPortProvider.getIfAvailable(),
                 sopSearchService,
                 accountStatusTool,
                 permissionsTool
@@ -65,10 +69,12 @@ public class AgentOrchestrator {
 
     public static AgentOrchestrator createDefault() {
         return new AgentOrchestrator(
+                AgentMode.DETERMINISTIC,
+                new DeterministicAgentDecisionService(),
+                null,
                 new SopSearchService(),
                 new MockAccountStatusTool(),
-                new MockUserPermissionsTool(),
-                AgentMode.DETERMINISTIC.name()
+                new MockUserPermissionsTool()
         );
     }
 
@@ -99,9 +105,7 @@ public class AgentOrchestrator {
         List<TraceEvent> traceEvents = new ArrayList<>();
         traceEvents.add(new TraceEvent("CLASSIFY", "category=" + category + ", priority=" + priority + ", risk=" + riskLevel));
         if (agentMode == AgentMode.SHADOW) {
-            traceEvents.add(shadowDecisionPort == null
-                    ? skippedShadowTraceEvent()
-                    : shadowTraceEvent(shadowDecisionPort.decide(context)));
+            traceEvents.add(shadowDecisionEvent(context));
         }
 
         if (riskLevel == RiskLevel.REJECT) {
@@ -273,6 +277,19 @@ public class AgentOrchestrator {
         );
     }
 
+    private TraceEvent shadowDecisionEvent(AgentContext context) {
+        if (shadowDecisionPort == null) {
+            return skippedShadowTraceEvent();
+        }
+        try {
+            return shadowTraceEvent(shadowDecisionPort.decide(context));
+        } catch (LlmDecisionException exception) {
+            return failedShadowTraceEvent(exception.status());
+        } catch (RuntimeException exception) {
+            return failedShadowTraceEvent("API_ERROR");
+        }
+    }
+
     private static AgentMode parseAgentMode(String agentModeValue) {
         return AgentMode.valueOf(agentModeValue.trim().replace('-', '_').toUpperCase(Locale.ROOT));
     }
@@ -281,6 +298,13 @@ public class AgentOrchestrator {
         return new TraceEvent(
                 "LLM_SHADOW_SKIPPED",
                 "agentMode=SHADOW, reason=no_shadow_decision_port"
+        );
+    }
+
+    private TraceEvent failedShadowTraceEvent(String llmStatus) {
+        return new TraceEvent(
+                "LLM_SHADOW_FAILED",
+                "llm_status=" + llmStatus + ", fallback_to=DETERMINISTIC"
         );
     }
 }

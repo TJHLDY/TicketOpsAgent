@@ -1,0 +1,16 @@
+spring:
+  ai:
+    model:
+      chat: deepseek
+    deepseek:
+      api-key: ${DEEPSEEK_API_KEY:}
+      chat:
+        model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
+        temperature: 0.0
+        max-tokens: 900
+
+ticketops:
+  agent:
+    mode: shadow
+    llm:
+      enabled: true
