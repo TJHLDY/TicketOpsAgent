@@ -23,6 +23,7 @@ The current MVP verifies a controllable backend agent chain:
 - DeepSeek shadow mode calls the model, parses a candidate `AgentDecision`, validates enums/tools/pending actions/confidence, and falls back to deterministic output on validation/API errors.
 - Mock LLM shadow Eval runner covers 34 accepted, unsafe, invalid model-output, tool-argument, and pending-action mismatch cases without requiring a real API key.
 - `scripts\accept.ps1` can optionally run a real DeepSeek shadow smoke check and record provider/model/prompt/schema/latency/fallback evidence.
+- DeepSeek shadow evaluation is phase-closed for this spike: evaluable, rollback-safe, and reproducible enough for review and resume/interview material.
 - No real enterprise system integration.
 
 ## Implemented MVP Scenarios
@@ -73,6 +74,12 @@ Expected chain:
 - `ticketops.agent.mode=shadow` keeps deterministic user-facing output and records shadow decision traces.
 - The `deepseek` profile enables a Spring AI-backed shadow decision service. Invalid or unsafe model output is recorded as `LLM_SHADOW_FAILED` and does not affect the user-facing response.
 - Current SOP retrieval is keyword/table driven, not vector RAG.
+
+## Documentation
+
+- [Acceptance review](docs/eval/acceptance-review.md): commands and expected gates for the current shadow acceptance report.
+- [DeepSeek shadow stage summary](docs/eval/deepseek-shadow-stage-summary.md): phase-close evidence, metrics, boundaries, and non-goals.
+- [Interview notes](docs/interview/ticketops-interview-notes.md): resume-safe wording, STAR story, trade-offs, and likely interviewer questions.
 
 ## Run Tests
 
@@ -190,11 +197,12 @@ Each request persists the ticket and execution evidence to `ticket`, `agent_trac
 
 ## Planned Next Phase
 
-The next phase keeps the deterministic baseline and uses the acceptance report as the review artifact:
+The DeepSeek shadow stage is closed for this spike. The next phase should not add feature scope by default. Keep the deterministic baseline and use the acceptance report as the review artifact.
 
-1. Send the latest sync package and acceptance report summary for review.
-2. Add 6 to 8 gap Eval cases for live-shadow edge cases and trace audit expectations.
-3. Keep tuning prompt/schema only inside shadow mode until acceptance metrics are stable.
-4. Promote to `llm` or `hybrid` mode only after shadow Eval cases and review show stable behavior.
+Recommended next work:
+
+1. Prepare resume and interview material from the verified shadow evidence.
+2. Merge or tag the current shadow-eval state after acceptance remains green.
+3. Only consider `hybrid`, `llm`, pgvector, frontend, or real enterprise integrations in a separate phase with a new acceptance plan.
 
 DeepSeek keys must be supplied through environment variables, never committed.

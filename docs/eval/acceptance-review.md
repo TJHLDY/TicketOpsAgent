@@ -2,6 +2,8 @@
 
 This file is the repo-side index for reviewing the current DeepSeek shadow acceptance stage.
 
+For the phase-close decision, read [DeepSeek Shadow Stage Summary](deepseek-shadow-stage-summary.md).
+
 ## One-command gate
 
 Run from the repository root:
