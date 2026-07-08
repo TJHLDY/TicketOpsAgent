@@ -291,7 +291,7 @@ function reviewButton(label, decision, actionId, comment) {
             setRunStatus("Review saved", "");
         } catch (error) {
             setRunStatus("Review error", "danger");
-            alert(error.message);
+            renderError("suggestion", error);
         }
     });
     return button;
@@ -363,9 +363,24 @@ async function requestJson(path, options = {}) {
     });
     if (!response.ok) {
         const text = await response.text();
-        throw new Error(`${response.status} ${response.statusText}: ${text || path}`);
+        throw buildApiError(response, text, path);
     }
     return response.json();
+}
+
+function buildApiError(response, text, path) {
+    let body = null;
+    try {
+        body = text ? JSON.parse(text) : null;
+    } catch {
+        body = null;
+    }
+    const error = new Error(body?.message || text || response.statusText || path);
+    error.status = response.status;
+    error.statusText = response.statusText;
+    error.errorCode = body?.errorCode || "";
+    error.path = body?.path || path;
+    return error;
 }
 
 function requireTicket() {
@@ -409,7 +424,15 @@ function clear(node) {
 }
 
 function renderError(elementId, error) {
-    document.getElementById(elementId).textContent = error.message || String(error);
+    document.getElementById(elementId).textContent = formatApiError(error);
+}
+
+function formatApiError(error) {
+    if (error?.status) {
+        const errorCode = error.errorCode ? ` ${error.errorCode}` : "";
+        return `${error.status}${errorCode}: ${error.message}`;
+    }
+    return error?.message || String(error);
 }
 
 function setRunStatus(text, variant) {

@@ -46,7 +46,11 @@ class DemoConsoleArtifactsTest {
                 .contains("/api/pending-actions/")
                 .contains("/api/eval/reports/latest")
                 .contains("approve")
-                .contains("reject");
+                .contains("reject")
+                .contains("formatApiError")
+                .contains("errorCode")
+                .contains("status");
+        assertThat(js).doesNotContain("alert(");
 
         assertThat(css)
                 .contains(".trace-timeline")

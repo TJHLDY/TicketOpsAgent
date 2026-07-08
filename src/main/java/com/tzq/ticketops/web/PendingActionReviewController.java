@@ -5,6 +5,7 @@ import com.tzq.ticketops.agent.PendingActionRecord;
 import com.tzq.ticketops.agent.PendingActionStatus;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,7 +14,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 
@@ -33,7 +33,7 @@ public class PendingActionReviewController {
     public PendingActionReviewResponse find(@PathVariable long actionId) {
         return logRepository.findPendingActionById(actionId)
                 .map(record -> PendingActionReviewResponse.from(record, ""))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "pending action not found"));
+                .orElseThrow(() -> ApiException.of(HttpStatus.NOT_FOUND, ApiErrorCode.PENDING_ACTION_NOT_FOUND));
     }
 
     @PostMapping(
@@ -77,19 +77,19 @@ public class PendingActionReviewController {
             String message
     ) {
         PendingActionRecord existing = logRepository.findPendingActionById(actionId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "pending action not found"));
+                .orElseThrow(() -> ApiException.of(HttpStatus.NOT_FOUND, ApiErrorCode.PENDING_ACTION_NOT_FOUND));
         if (existing.status() != PendingActionStatus.PENDING) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "pending action already reviewed");
+            throw ApiException.of(HttpStatus.CONFLICT, ApiErrorCode.PENDING_ACTION_ALREADY_REVIEWED);
         }
         logRepository.updatePendingActionReview(actionId, status, request.reviewerId(), request.reviewComment());
         PendingActionRecord updated = logRepository.findPendingActionById(actionId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "pending action not found"));
+                .orElseThrow(() -> ApiException.of(HttpStatus.NOT_FOUND, ApiErrorCode.PENDING_ACTION_NOT_FOUND));
         return PendingActionReviewResponse.from(updated, message);
     }
 
     public record PendingActionReviewRequest(
             @NotBlank String reviewerId,
-            @NotBlank String reviewComment
+            @NotBlank @Size(max = 200) String reviewComment
     ) {
     }
 
