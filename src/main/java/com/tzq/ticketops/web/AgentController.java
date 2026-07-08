@@ -44,6 +44,12 @@ public class AgentController {
                 request.title(),
                 request.description()
         ));
+        ticketService.updateDecisionSummary(
+                ticket.id(),
+                response.category(),
+                response.priority(),
+                response.riskLevel()
+        );
         logRepository.save(new AgentExecutionLog(
                 ticket.id(),
                 response.traceEvents(),

@@ -1,45 +1,145 @@
 package com.tzq.ticketops.agent;
 
+import com.tzq.ticketops.agent.decision.AgentContext;
+import com.tzq.ticketops.agent.decision.AgentDecision;
+import com.tzq.ticketops.agent.decision.AgentDecisionPort;
+import com.tzq.ticketops.agent.decision.AgentMode;
+import com.tzq.ticketops.agent.decision.DeepSeekLlmAgentDecisionService;
+import com.tzq.ticketops.agent.decision.DeterministicAgentDecisionService;
+import com.tzq.ticketops.agent.decision.LlmDecisionException;
 import com.tzq.ticketops.rag.SopSearchService;
 import com.tzq.ticketops.tools.AccountStatusResult;
 import com.tzq.ticketops.tools.MockAccountStatusTool;
 import com.tzq.ticketops.tools.MockUserPermissionsTool;
 import com.tzq.ticketops.tools.UserPermissionsResult;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
+import java.util.stream.Collectors;
 
 @Service
 public class AgentOrchestrator {
 
+    private static final String DEFAULT_LLM_PROVIDER = "deepseek";
+    private static final String DEFAULT_LLM_MODEL = "deepseek-v4-flash";
+    private static final String DEFAULT_PROMPT_VERSION = "deepseek-shadow-v2";
+    private static final String DEFAULT_SCHEMA_VERSION = "agent-decision-v1";
+
     private final SopSearchService sopSearchService;
     private final MockAccountStatusTool accountStatusTool;
     private final MockUserPermissionsTool permissionsTool;
+    private final AgentMode agentMode;
+    private final AgentDecisionPort decisionPort;
+    private final AgentDecisionPort shadowDecisionPort;
+    private final String llmProvider;
+    private final String llmModel;
+    private final String promptVersion;
+    private final String schemaVersion;
 
+    @Autowired
     public AgentOrchestrator(
             SopSearchService sopSearchService,
             MockAccountStatusTool accountStatusTool,
-            MockUserPermissionsTool permissionsTool
+            MockUserPermissionsTool permissionsTool,
+            @Value("${ticketops.agent.mode:deterministic}") String agentModeValue,
+            @Value("${ticketops.agent.llm.provider:deepseek}") String llmProvider,
+            @Value("${ticketops.agent.llm.model:deepseek-v4-flash}") String llmModel,
+            @Value("${ticketops.agent.llm.prompt-version:deepseek-shadow-v2}") String promptVersion,
+            @Value("${ticketops.agent.llm.schema-version:agent-decision-v1}") String schemaVersion,
+            ObjectProvider<DeepSeekLlmAgentDecisionService> shadowDecisionPortProvider
+    ) {
+        this(
+                parseAgentMode(agentModeValue),
+                new DeterministicAgentDecisionService(),
+                shadowDecisionPortProvider.getIfAvailable(),
+                sopSearchService,
+                accountStatusTool,
+                permissionsTool,
+                llmProvider,
+                llmModel,
+                promptVersion,
+                schemaVersion
+        );
+    }
+
+    private AgentOrchestrator(
+            AgentMode agentMode,
+            AgentDecisionPort decisionPort,
+            AgentDecisionPort shadowDecisionPort,
+            SopSearchService sopSearchService,
+            MockAccountStatusTool accountStatusTool,
+            MockUserPermissionsTool permissionsTool,
+            String llmProvider,
+            String llmModel,
+            String promptVersion,
+            String schemaVersion
     ) {
         this.sopSearchService = sopSearchService;
         this.accountStatusTool = accountStatusTool;
         this.permissionsTool = permissionsTool;
+        this.agentMode = agentMode;
+        this.decisionPort = decisionPort;
+        this.shadowDecisionPort = shadowDecisionPort;
+        this.llmProvider = llmProvider;
+        this.llmModel = llmModel;
+        this.promptVersion = promptVersion;
+        this.schemaVersion = schemaVersion;
     }
 
     public static AgentOrchestrator createDefault() {
-        return new AgentOrchestrator(new SopSearchService(), new MockAccountStatusTool(), new MockUserPermissionsTool());
+        return new AgentOrchestrator(
+                AgentMode.DETERMINISTIC,
+                new DeterministicAgentDecisionService(),
+                null,
+                new SopSearchService(),
+                new MockAccountStatusTool(),
+                new MockUserPermissionsTool(),
+                DEFAULT_LLM_PROVIDER,
+                DEFAULT_LLM_MODEL,
+                DEFAULT_PROMPT_VERSION,
+                DEFAULT_SCHEMA_VERSION
+        );
+    }
+
+    public static AgentOrchestrator createWithDecisionMode(
+            AgentMode agentMode,
+            AgentDecisionPort shadowDecisionPort,
+            SopSearchService sopSearchService,
+            MockAccountStatusTool accountStatusTool,
+            MockUserPermissionsTool permissionsTool
+    ) {
+        return new AgentOrchestrator(
+                agentMode,
+                new DeterministicAgentDecisionService(),
+                shadowDecisionPort,
+                sopSearchService,
+                accountStatusTool,
+                permissionsTool,
+                DEFAULT_LLM_PROVIDER,
+                DEFAULT_LLM_MODEL,
+                DEFAULT_PROMPT_VERSION,
+                DEFAULT_SCHEMA_VERSION
+        );
     }
 
     public AgentResponse handle(AgentRequest request) {
-        String text = request.title() + "\n" + request.description();
-        TicketCategory category = classify(text);
-        TicketPriority priority = priorityFor(category);
-        RiskLevel riskLevel = riskFor(category, text);
+        AgentContext context = new AgentContext(request.requesterId(), request.title(), request.description());
+        AgentDecision decision = decisionPort.decide(context);
+        TicketCategory category = decision.category();
+        TicketPriority priority = decision.priority();
+        RiskLevel riskLevel = decision.riskLevel();
 
         List<TraceEvent> traceEvents = new ArrayList<>();
         traceEvents.add(new TraceEvent("CLASSIFY", "category=" + category + ", priority=" + priority + ", risk=" + riskLevel));
+        if (agentMode == AgentMode.SHADOW) {
+            traceEvents.add(shadowDecisionEvent(context));
+        }
 
         if (riskLevel == RiskLevel.REJECT) {
             return rejectedResponse(category, priority, riskLevel, traceEvents);
@@ -180,48 +280,6 @@ public class AgentOrchestrator {
         );
     }
 
-    private TicketCategory classify(String text) {
-        if (text.contains("锁定") || text.contains("账号已锁")) {
-            return TicketCategory.ACCOUNT_LOCKED;
-        }
-        if (text.contains("MFA") || text.contains("验证码") || text.contains("多因素")) {
-            return TicketCategory.MFA_ISSUE;
-        }
-        if (text.contains("权限") || text.contains("无权访问")) {
-            return TicketCategory.PERMISSION_REQUEST;
-        }
-        if (text.contains("登录") || text.contains("登陆")) {
-            return TicketCategory.LOGIN_FAILED;
-        }
-        return TicketCategory.UNKNOWN;
-    }
-
-    private TicketPriority priorityFor(TicketCategory category) {
-        return switch (category) {
-            case ACCOUNT_LOCKED, MFA_ISSUE -> TicketPriority.P2;
-            case LOGIN_FAILED, PERMISSION_REQUEST -> TicketPriority.P3;
-            case UNKNOWN -> TicketPriority.P3;
-        };
-    }
-
-    private RiskLevel riskFor(TicketCategory category, String text) {
-        if (containsUnsafePrivilegeRequest(text)) {
-            return RiskLevel.REJECT;
-        }
-        return switch (category) {
-            case ACCOUNT_LOCKED, MFA_ISSUE, PERMISSION_REQUEST -> RiskLevel.NEEDS_APPROVAL;
-            case LOGIN_FAILED -> RiskLevel.READ_ONLY;
-            case UNKNOWN -> RiskLevel.REJECT;
-        };
-    }
-
-    private boolean containsUnsafePrivilegeRequest(String text) {
-        return text.contains("绕过审批")
-                || text.contains("管理员权限")
-                || text.contains("生产系统管理员")
-                || text.contains("越权");
-    }
-
     private String extractAppCode(String text) {
         if (text.contains("CRM")) {
             return "CRM";
@@ -233,5 +291,77 @@ public class AgentOrchestrator {
             return "VPN";
         }
         return "OA";
+    }
+
+    private TraceEvent shadowTraceEvent(AgentDecision shadowDecision, long latencyMs) {
+        String toolIntents = shadowDecision.toolIntents().stream()
+                .map(intent -> intent.toolName())
+                .collect(Collectors.joining(","));
+        if (toolIntents.isBlank()) {
+            toolIntents = "none";
+        }
+        return new TraceEvent(
+                "LLM_SHADOW",
+                "category=" + shadowDecision.category()
+                        + ", priority=" + shadowDecision.priority()
+                        + ", risk=" + shadowDecision.riskLevel()
+                        + ", confidence=" + shadowDecision.confidence()
+                        + ", toolIntents=" + toolIntents
+                        + ", llm_status=ACCEPTED"
+                        + ", fallback_reason=none"
+                        + ", fallback_to=none"
+                        + shadowAuditDetail(latencyMs)
+                        + ", validation_errors=none"
+        );
+    }
+
+    private TraceEvent shadowDecisionEvent(AgentContext context) {
+        if (shadowDecisionPort == null) {
+            return skippedShadowTraceEvent();
+        }
+        long startedAt = System.nanoTime();
+        try {
+            return shadowTraceEvent(shadowDecisionPort.decide(context), elapsedMillis(startedAt));
+        } catch (LlmDecisionException exception) {
+            return failedShadowTraceEvent(exception.status(), elapsedMillis(startedAt));
+        } catch (RuntimeException exception) {
+            return failedShadowTraceEvent("API_ERROR", elapsedMillis(startedAt));
+        }
+    }
+
+    private long elapsedMillis(long startedAt) {
+        return Math.max(0, (System.nanoTime() - startedAt) / 1_000_000);
+    }
+
+    private static AgentMode parseAgentMode(String agentModeValue) {
+        return AgentMode.valueOf(agentModeValue.trim().replace('-', '_').toUpperCase(Locale.ROOT));
+    }
+
+    private TraceEvent skippedShadowTraceEvent() {
+        return new TraceEvent(
+                "LLM_SHADOW_SKIPPED",
+                "agentMode=SHADOW, reason=no_shadow_decision_port"
+        );
+    }
+
+    private TraceEvent failedShadowTraceEvent(String llmStatus, long latencyMs) {
+        return new TraceEvent(
+                "LLM_SHADOW_FAILED",
+                "llm_status=" + llmStatus
+                        + ", fallback_reason=" + llmStatus
+                        + ", fallback_to=DETERMINISTIC"
+                        + shadowAuditDetail(latencyMs)
+                        + ", validation_errors=" + llmStatus
+        );
+    }
+
+    private String shadowAuditDetail(long latencyMs) {
+        return ", provider=" + llmProvider
+                + ", model=" + llmModel
+                + ", prompt_version=" + promptVersion
+                + ", schema_version=" + schemaVersion
+                + ", latency_ms=" + latencyMs
+                + ", final_decision_source=DETERMINISTIC"
+                + ", user_visible_changed=false";
     }
 }
