@@ -10,13 +10,12 @@ import com.tzq.ticketops.agent.TraceEventRecord;
 import com.tzq.ticketops.ticket.Ticket;
 import com.tzq.ticketops.ticket.TicketService;
 import com.tzq.ticketops.ticket.TicketStatus;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 import java.time.Instant;
 import java.util.List;
@@ -38,7 +37,7 @@ public class TicketQueryController {
     public TicketDto findTicket(@PathVariable String ticketId) {
         return ticketService.findById(ticketId)
                 .map(TicketDto::from)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "ticket not found"));
+                .orElseThrow(() -> ApiException.of(HttpStatus.NOT_FOUND, ApiErrorCode.TICKET_NOT_FOUND));
     }
 
     @GetMapping
@@ -85,7 +84,7 @@ public class TicketQueryController {
 
     private void ensureTicketExists(String ticketId) {
         if (ticketService.findById(ticketId).isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "ticket not found");
+            throw ApiException.of(HttpStatus.NOT_FOUND, ApiErrorCode.TICKET_NOT_FOUND);
         }
     }
 

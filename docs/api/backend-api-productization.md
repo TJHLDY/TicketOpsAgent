@@ -18,6 +18,32 @@ This guide covers the local demo flow only:
 
 The eval report endpoint is for local demo and development review only. It is not a production monitoring API.
 
+## API Error Contract
+
+Backend API failures return a stable JSON body:
+
+```json
+{
+  "errorCode": "PENDING_ACTION_ALREADY_REVIEWED",
+  "message": "Pending action already reviewed",
+  "path": "/api/pending-actions/1/approve",
+  "timestamp": "2026-07-08T17:30:00Z"
+}
+```
+
+Common cases:
+
+| Scenario | HTTP status | `errorCode` |
+| --- | ---: | --- |
+| Ticket id does not exist | 404 | `TICKET_NOT_FOUND` |
+| Pending action id does not exist | 404 | `PENDING_ACTION_NOT_FOUND` |
+| Approve or reject an already reviewed pending action | 409 | `PENDING_ACTION_ALREADY_REVIEWED` |
+| Approve or reject a cancelled pending action | 409 | `PENDING_ACTION_ALREADY_REVIEWED` |
+| Blank reviewer id, blank comment, overlong comment, or malformed body | 400 | `INVALID_REQUEST` |
+
+Pending action review comments are limited to 200 characters. Successful approve/reject responses still keep
+`executionStatus=NOT_EXECUTED_MOCK_ONLY`; no real enterprise operation is executed.
+
 ## Prerequisites
 
 Generate the local acceptance report first:

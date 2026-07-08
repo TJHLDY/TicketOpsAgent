@@ -20,13 +20,14 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 1.1.8 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 57 automated tests passing at the latest verification.
+- 67 automated tests passing at the latest verification.
 - `AgentDecisionPort` boundary in place with deterministic routing plus DeepSeek shadow evaluation.
 - DeepSeek shadow mode calls the model, parses a candidate `AgentDecision`, validates enums/tools/pending actions/confidence, and falls back to deterministic output on validation/API errors.
 - Mock LLM shadow Eval runner covers 34 accepted, unsafe, invalid model-output, tool-argument, and pending-action mismatch cases without requiring a real API key.
 - `scripts\accept.ps1` can optionally run a real DeepSeek shadow smoke check and record provider/model/prompt/schema/latency/fallback evidence.
 - DeepSeek shadow evaluation is phase-closed for this spike: evaluable, rollback-safe, and reproducible enough for review and resume/interview material.
 - Backend API productization is implemented: ticket detail/list, trace/tool call reads, pending action review, and eval report reads.
+- Backend API error contract hardening is implemented: stable JSON error codes for missing resources, invalid requests, and already reviewed pending actions.
 - No real enterprise system integration.
 
 ## Implemented MVP Scenarios
@@ -138,9 +139,9 @@ The deterministic path remains the user-facing main flow. The DeepSeek path is a
 
 ## Validation Evidence
 
-Latest local validation before public release:
+Latest local validation:
 
-- `mvn test`: 57 tests PASS
+- `mvn test`: 67 tests PASS
 - `scripts\accept.ps1`: PASS
 - Secret scan: PASS
 - Shadow eval: 34 cases
@@ -200,7 +201,7 @@ This repository is not a production AI Agent or production ITSM system. It does 
 - [x] Backend API demo script
 - [x] Public portfolio README hardening
 - [x] Lightweight static demo console
-- [ ] Optional API error contract hardening
+- [x] API error contract hardening
 
 ## Documentation
 
