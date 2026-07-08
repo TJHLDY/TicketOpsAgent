@@ -25,7 +25,7 @@ class ReadmePublicReadinessTest {
                 .contains("Deterministic Decision Service")
                 .contains("DeepSeek Shadow Candidate")
                 .contains("## Validation Evidence")
-                .contains("55 tests PASS")
+                .contains("57 tests PASS")
                 .contains("local validation evidence, not a production SLA")
                 .contains("## Demo Data")
                 .contains("mock-user-001")
