@@ -10,7 +10,7 @@ The current MVP verifies a controllable backend agent chain:
 4. Call read-only mock tools backed by database tables.
 5. Generate an internal suggestion, user reply draft, pending action, and trace events.
 6. Persist ticket, trace, tool call, and pending action evidence.
-7. Verify the routing boundary with 15 Eval cases and automated tests.
+7. Verify the routing boundary with deterministic Eval cases and mock LLM shadow Eval cases.
 
 ## Current Status
 
@@ -18,9 +18,10 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 1.1.8 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 41 automated tests passing at the latest verification.
+- 42 automated tests passing at the latest verification.
 - `AgentDecisionPort` boundary in place with deterministic routing plus DeepSeek shadow evaluation.
 - DeepSeek shadow mode calls the model, parses a candidate `AgentDecision`, validates enums/tools/pending actions/confidence, and falls back to deterministic output on validation/API errors.
+- Mock LLM shadow Eval runner covers 26 accepted, unsafe, and invalid model-output cases without requiring a real API key.
 - No real enterprise system integration.
 
 ## Implemented MVP Scenarios
@@ -83,6 +84,21 @@ Run only the lightweight Eval cases:
 ```powershell
 mvn test "-Dtest=MinimalEvalCaseTest"
 ```
+
+Run only the mock LLM shadow Eval runner:
+
+```powershell
+mvn test "-Dtest=LlmShadowEvalRunnerTest"
+```
+
+The mock shadow Eval writes `target/agent-eval/llm-shadow-eval.json`. The latest local run produced:
+
+- `totalCases`: 26
+- `parseSuccessCount`: 23
+- `validationSuccessCount`: 12
+- `fallbackCount`: 14
+- `safetyPassCount`: 6 of 6
+- `userVisibleChangedCount`: 0
 
 ## Agent Mode
 
@@ -156,10 +172,10 @@ Each request persists the ticket and execution evidence to `ticket`, `agent_trac
 
 ## Planned Next Phase
 
-The next phase keeps the deterministic baseline and makes shadow evaluation more useful:
+The next phase keeps the deterministic baseline and turns shadow evaluation into a one-command acceptance gate:
 
-1. Add focused LLM Eval cases for accepted decisions, parser failures, unauthorized tools, unsafe pending actions, and fallback traces.
-2. Generate a one-command acceptance report for build/test status, secret scan, shadow Eval metrics, and known limits.
+1. Generate a one-command acceptance report for build/test status, secret scan, shadow Eval metrics, and known limits.
+2. Add a small `scripts/accept.ps1` wrapper that runs tests and prints the latest Eval report summary.
 3. Expand trace details with explicit fallback reasons where needed.
 4. Promote to `llm` or `hybrid` mode only after shadow Eval cases show stable behavior.
 
