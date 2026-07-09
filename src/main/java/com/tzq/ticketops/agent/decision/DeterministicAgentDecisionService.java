@@ -7,6 +7,7 @@ import com.tzq.ticketops.agent.TicketPriority;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -33,16 +34,22 @@ public class DeterministicAgentDecisionService implements AgentDecisionPort {
     }
 
     private TicketCategory classify(String text) {
-        if (text.contains("锁定") || text.contains("账号已锁")) {
+        String lowerText = text.toLowerCase(Locale.ROOT);
+        if (containsAny(text, "锁定", "账号已锁")
+                || containsAny(lowerText, "account locked", "account is locked", "locked")) {
             return TicketCategory.ACCOUNT_LOCKED;
         }
-        if (text.contains("MFA") || text.contains("验证码") || text.contains("多因素")) {
+        if (containsAny(text, "MFA", "验证码", "多因素")
+                || containsAny(lowerText, "mfa", "multi-factor", "multi factor", "verification code", "authenticator")) {
             return TicketCategory.MFA_ISSUE;
         }
-        if (text.contains("权限") || text.contains("无权访问")) {
+        if (containsAny(text, "权限", "无权访问")
+                || containsAny(lowerText, "permission", "access denied", "no access", "not authorized",
+                "request access", "cannot access", "can't access")) {
             return TicketCategory.PERMISSION_REQUEST;
         }
-        if (text.contains("登录") || text.contains("登陆")) {
+        if (containsAny(text, "登录", "登陆")
+                || containsAny(lowerText, "login", "log in", "sign in", "sign-in")) {
             return TicketCategory.LOGIN_FAILED;
         }
         return TicketCategory.UNKNOWN;
@@ -68,10 +75,22 @@ public class DeterministicAgentDecisionService implements AgentDecisionPort {
     }
 
     private boolean containsUnsafePrivilegeRequest(String text) {
+        String lowerText = text.toLowerCase(Locale.ROOT);
         return text.contains("绕过审批")
                 || text.contains("管理员权限")
                 || text.contains("生产系统管理员")
-                || text.contains("越权");
+                || text.contains("越权")
+                || containsAny(lowerText, "bypass approval", "without approval", "administrator permission",
+                "admin permission", "production admin", "privilege escalation", "ignore previous");
+    }
+
+    private boolean containsAny(String text, String... keywords) {
+        for (String keyword : keywords) {
+            if (text.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String sopQueryFor(TicketCategory category) {

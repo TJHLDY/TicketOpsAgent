@@ -25,8 +25,11 @@ class ReadmePublicReadinessTest {
                 .contains("/api/agent/chat")
                 .contains("Deterministic Decision Service")
                 .contains("DeepSeek Shadow Candidate")
+                .contains("## Scenario Acceptance")
+                .contains("ScenarioAcceptanceTest")
+                .contains("docs/scenarios/scenario-playbook.md")
                 .contains("## Validation Evidence")
-                .contains("67 tests PASS")
+                .contains("74 tests PASS")
                 .contains("local validation evidence, not a production SLA")
                 .contains("## Demo Data")
                 .contains("mock-user-001")
@@ -41,6 +44,7 @@ class ReadmePublicReadinessTest {
                 .contains("LLM main decisioning")
                 .contains("## Roadmap")
                 .contains("Lightweight static demo console")
+                .contains("Scenario acceptance suite")
                 .contains("## License")
                 .contains("MIT License");
     }
