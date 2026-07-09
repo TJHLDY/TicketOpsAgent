@@ -20,7 +20,7 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 1.1.8 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 67 automated tests passing at the latest verification.
+- 74 automated tests passing at the latest verification.
 - `AgentDecisionPort` boundary in place with deterministic routing plus DeepSeek shadow evaluation.
 - DeepSeek shadow mode calls the model, parses a candidate `AgentDecision`, validates enums/tools/pending actions/confidence, and falls back to deterministic output on validation/API errors.
 - Mock LLM shadow Eval runner covers 34 accepted, unsafe, invalid model-output, tool-argument, and pending-action mismatch cases without requiring a real API key.
@@ -112,6 +112,19 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts\
 
 Do not commit API keys. DeepSeek keys must be supplied through environment variables only.
 
+## Scenario Acceptance
+
+The core backend ticket flows are covered by `ScenarioAcceptanceTest`:
+account lock, permission request, MFA issue, prompt injection rejection, and non-IT request rejection.
+
+Run the scenario suite:
+
+```powershell
+mvn test "-Dtest=ScenarioAcceptanceTest"
+```
+
+See [docs/scenarios/scenario-playbook.md](docs/scenarios/scenario-playbook.md) for the accepted inputs, expected classifications, tool calls, pending actions, and boundaries.
+
 ## Architecture Overview
 
 ```text
@@ -141,7 +154,7 @@ The deterministic path remains the user-facing main flow. The DeepSeek path is a
 
 Latest local validation:
 
-- `mvn test`: 67 tests PASS
+- `mvn test`: 74 tests PASS
 - `scripts\accept.ps1`: PASS
 - Secret scan: PASS
 - Shadow eval: 34 cases
@@ -202,12 +215,14 @@ This repository is not a production AI Agent or production ITSM system. It does 
 - [x] Public portfolio README hardening
 - [x] Lightweight static demo console
 - [x] API error contract hardening
+- [x] Scenario acceptance suite
 
 ## Documentation
 
 - [Acceptance review](docs/eval/acceptance-review.md): commands and expected gates for the current shadow acceptance report.
 - [DeepSeek shadow stage summary](docs/eval/deepseek-shadow-stage-summary.md): phase-close evidence, metrics, boundaries, and non-goals.
 - [Backend API productization guide](docs/api/backend-api-productization.md): local demo flow for ticket, trace, tool call, pending action review, and eval report APIs.
+- [Scenario acceptance playbook](docs/scenarios/scenario-playbook.md): accepted business scenarios, expected evidence, and non-goals.
 - [Interview notes](docs/interview/ticketops-interview-notes.md): resume-safe wording, STAR story, trade-offs, and likely interviewer questions.
 
 ## License

@@ -174,7 +174,10 @@ public class AgentOrchestrator {
     ) {
         String text = request.title() + "\n" + request.description();
         SopReference sop = sopSearchService.findBest(text);
-        traceEvents.add(new TraceEvent("RAG_RETRIEVE", "doc=" + sop.title() + ", similarity=" + sop.similarity()));
+        traceEvents.add(new TraceEvent(
+                "RAG_RETRIEVE",
+                "docId=" + sop.id() + ", doc=" + sop.title() + ", similarity=" + sop.similarity()
+        ));
 
         String appCode = extractAppCode(text);
         UserPermissionsResult permissions = permissionsTool.getUserPermissions(request.requesterId(), appCode);
@@ -247,7 +250,10 @@ public class AgentOrchestrator {
             RiskLevel riskLevel
     ) {
         SopReference sop = sopSearchService.findBest(request.title() + "\n" + request.description());
-        traceEvents.add(new TraceEvent("RAG_RETRIEVE", "doc=" + sop.title() + ", similarity=" + sop.similarity()));
+        traceEvents.add(new TraceEvent(
+                "RAG_RETRIEVE",
+                "docId=" + sop.id() + ", doc=" + sop.title() + ", similarity=" + sop.similarity()
+        ));
 
         AccountStatusResult accountStatus = accountStatusTool.getAccountStatus(request.requesterId());
         ToolCallRecord toolCall = new ToolCallRecord(

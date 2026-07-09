@@ -6,6 +6,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Locale;
 
 @Component
 public class SopSearchService {
@@ -64,11 +65,28 @@ public class SopSearchService {
     }
 
     private boolean matches(String text, SopDocument document) {
-        if (text.contains("锁定") && document.id().equals("SOP-ACCOUNT-LOCKED")) {
+        String lowerText = text.toLowerCase(Locale.ROOT);
+        if ((text.contains("锁定") || lowerText.contains("locked"))
+                && document.id().equals("SOP-ACCOUNT-LOCKED")) {
             return true;
         }
-        return (text.contains("权限") || text.contains("无权访问"))
+        if (containsAny(text, "MFA", "验证码", "多因素")
+                || containsAny(lowerText, "mfa", "multi-factor", "multi factor", "verification code", "authenticator")) {
+            return document.id().equals("SOP-MFA-ISSUE");
+        }
+        return (containsAny(text, "权限", "无权访问")
+                || containsAny(lowerText, "permission", "access denied", "no access", "not authorized",
+                "request access", "cannot access", "can't access"))
                 && document.id().equals("SOP-PERMISSION-REQUEST");
+    }
+
+    private boolean containsAny(String text, String... keywords) {
+        for (String keyword : keywords) {
+            if (text.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private List<SopDocument> loadDocuments() {
