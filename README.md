@@ -20,7 +20,7 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 1.1.8 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 74 automated tests passing at the latest verification.
+- 77 automated tests passing at the latest verification.
 - `AgentDecisionPort` boundary in place with deterministic routing plus DeepSeek shadow evaluation.
 - DeepSeek shadow mode calls the model, parses a candidate `AgentDecision`, validates enums/tools/pending actions/confidence, and falls back to deterministic output on validation/API errors.
 - Mock LLM shadow Eval runner covers 34 accepted, unsafe, invalid model-output, tool-argument, and pending-action mismatch cases without requiring a real API key.
@@ -95,6 +95,7 @@ Start the app and run the backend API demo:
 ```powershell
 mvn spring-boot:run
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\demo-backend-api.ps1 -BaseUrl http://localhost:8080
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\demo-scenarios.ps1 -BaseUrl http://localhost:8080
 ```
 
 Open the lightweight static demo console:
@@ -125,6 +126,23 @@ mvn test "-Dtest=ScenarioAcceptanceTest"
 
 See [docs/scenarios/scenario-playbook.md](docs/scenarios/scenario-playbook.md) for the accepted inputs, expected classifications, tool calls, pending actions, and boundaries.
 
+## Scenario Demo Report
+
+`scripts\demo-scenarios.ps1` replays the five accepted MVP scenarios against a running local app and writes:
+
+- `target/scenario-acceptance/scenario-report.json`
+- `target/scenario-acceptance/scenario-report.md`
+
+The report summarizes `totalScenarios`, `passedScenarios`, `failedScenarios`, and per-scenario evidence such as category, risk level, retrieved SOP, read-only tool result, pending action, and `NOT_EXECUTED_MOCK_ONLY` execution status.
+
+Run without calling the server:
+
+```powershell
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts\demo-scenarios.ps1 -ShowPlan
+```
+
+See [docs/scenarios/scenario-report-guide.md](docs/scenarios/scenario-report-guide.md) for the report shape, review method, and boundaries.
+
 ## Architecture Overview
 
 ```text
@@ -154,7 +172,7 @@ The deterministic path remains the user-facing main flow. The DeepSeek path is a
 
 Latest local validation:
 
-- `mvn test`: 74 tests PASS
+- `mvn test`: 77 tests PASS
 - `scripts\accept.ps1`: PASS
 - Secret scan: PASS
 - Shadow eval: 34 cases
@@ -163,6 +181,7 @@ Latest local validation:
 - User-visible changed count: 0
 - Optional live smoke: supported
 - Demo script: 7-step backend flow PASS
+- Scenario demo report: 5 scenarios PASS
 
 These numbers are local validation evidence, not a production SLA.
 
@@ -216,6 +235,7 @@ This repository is not a production AI Agent or production ITSM system. It does 
 - [x] Lightweight static demo console
 - [x] API error contract hardening
 - [x] Scenario acceptance suite
+- [x] Scenario demo script and report summary
 
 ## Documentation
 
@@ -223,6 +243,7 @@ This repository is not a production AI Agent or production ITSM system. It does 
 - [DeepSeek shadow stage summary](docs/eval/deepseek-shadow-stage-summary.md): phase-close evidence, metrics, boundaries, and non-goals.
 - [Backend API productization guide](docs/api/backend-api-productization.md): local demo flow for ticket, trace, tool call, pending action review, and eval report APIs.
 - [Scenario acceptance playbook](docs/scenarios/scenario-playbook.md): accepted business scenarios, expected evidence, and non-goals.
+- [Scenario report guide](docs/scenarios/scenario-report-guide.md): local script, generated report shape, and acceptance review method.
 - [Interview notes](docs/interview/ticketops-interview-notes.md): resume-safe wording, STAR story, trade-offs, and likely interviewer questions.
 
 ## License
@@ -376,6 +397,12 @@ Run the end-to-end backend API demo script:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\demo-backend-api.ps1
+```
+
+Run the five-scenario local report script:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\demo-scenarios.ps1
 ```
 
 ## Planned Next Phase
