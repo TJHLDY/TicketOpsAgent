@@ -1,6 +1,7 @@
 param(
     [string]$BaseUrl = "http://localhost:8080",
     [string]$ReportDir = "target/scenario-acceptance",
+    [string]$RunId = "",
     [switch]$ShowPlan
 )
 
@@ -10,6 +11,9 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 
 $JsonReportPath = Join-Path $ReportDir "scenario-report.json"
 $MarkdownReportPath = Join-Path $ReportDir "scenario-report.md"
+if ([string]::IsNullOrWhiteSpace($RunId)) {
+    $RunId = (Get-Date).ToUniversalTime().ToString("yyyyMMddHHmmssfff")
+}
 
 function Show-ScenarioPlan {
     Write-Output "TicketOpsAgent scenario demo flow"
@@ -21,6 +25,7 @@ function Show-ScenarioPlan {
     Write-Output "Reports:"
     Write-Output "target/scenario-acceptance/scenario-report.json"
     Write-Output "target/scenario-acceptance/scenario-report.md"
+    Write-Output "Ticket binding: response ticketId first, scenarioRunId fallback/debug marker."
     Write-Output "Boundary: pending actions keep executionStatus=NOT_EXECUTED_MOCK_ONLY."
     Write-Output "Boundary: No real enterprise operation is executed."
 }
@@ -96,19 +101,38 @@ function Convert-ToArray {
     return @($Value)
 }
 
-function Select-LatestTicket {
+function Select-TicketByRunId {
     param(
         [string]$RequesterId,
-        [string]$Category
+        [string]$Category,
+        [string]$RunId
     )
 
     $encodedRequesterId = [uri]::EscapeDataString($RequesterId)
-    $ticketList = Invoke-TicketOpsJson -Path "/api/tickets?status=OPEN&category=$Category&requesterId=$encodedRequesterId&page=0&size=1"
-    $ticket = @($ticketList.items) | Select-Object -First 1
+    $ticketList = Invoke-TicketOpsJson -Path "/api/tickets?status=OPEN&category=$Category&requesterId=$encodedRequesterId&page=0&size=20"
+    $ticket = @(Convert-ToArray -Value $ticketList.items) |
+            Where-Object { $_.title -like "*scenarioRunId=$RunId*" } |
+            Select-Object -First 1
     if ($null -eq $ticket) {
-        throw "Created ticket was not found by requesterId=$RequesterId and category=$Category"
+        throw "Created ticket was not found by requesterId=$RequesterId category=$Category scenarioRunId=$RunId"
     }
     return $ticket
+}
+
+function Resolve-TicketId {
+    param(
+        [object]$agentResponse,
+        [hashtable]$Scenario,
+        [string]$RunId
+    )
+
+    $ticketId = $agentResponse.ticketId
+    if (-not [string]::IsNullOrWhiteSpace("$ticketId")) {
+        return $ticketId
+    }
+
+    $ticket = Select-TicketByRunId -RequesterId $Scenario.RequesterId -Category $Scenario.ExpectedCategory -RunId $RunId
+    return $ticket.id
 }
 
 function Get-FirstValue {
@@ -130,17 +154,20 @@ function Invoke-Scenario {
         [hashtable]$Scenario
     )
 
-    Invoke-TicketOpsJson -Method "Post" -Path "/api/agent/chat" -Body @{
-        requesterId = $Scenario.RequesterId
-        title = $Scenario.Title
-        description = $Scenario.Description
-    } | Out-Null
+    $scenarioTitle = "$($Scenario.Title) [scenarioRunId=$RunId][case=$($Scenario.Id)]"
+    $scenarioDescription = "$($Scenario.Description)`nscenarioRunId=$RunId; scenarioCase=$($Scenario.Id)"
 
-    $ticket = Select-LatestTicket -RequesterId $Scenario.RequesterId -Category $Scenario.ExpectedCategory
-    $ticketDetail = Invoke-TicketOpsJson -Path "/api/tickets/$($ticket.id)"
-    $trace = @(Convert-ToArray -Value (Invoke-TicketOpsJson -Path "/api/tickets/$($ticket.id)/trace"))
-    $toolCalls = @(Convert-ToArray -Value (Invoke-TicketOpsJson -Path "/api/tickets/$($ticket.id)/tool-calls"))
-    $pendingActions = @(Convert-ToArray -Value (Invoke-TicketOpsJson -Path "/api/tickets/$($ticket.id)/pending-actions"))
+    $agentResponse = Invoke-TicketOpsJson -Method "Post" -Path "/api/agent/chat" -Body @{
+        requesterId = $Scenario.RequesterId
+        title = $scenarioTitle
+        description = $scenarioDescription
+    }
+
+    $ticketId = Resolve-TicketId -AgentResponse $agentResponse -Scenario $Scenario -RunId $RunId
+    $ticketDetail = Invoke-TicketOpsJson -Path "/api/tickets/$ticketId"
+    $trace = @(Convert-ToArray -Value (Invoke-TicketOpsJson -Path "/api/tickets/$ticketId/trace"))
+    $toolCalls = @(Convert-ToArray -Value (Invoke-TicketOpsJson -Path "/api/tickets/$ticketId/tool-calls"))
+    $pendingActions = @(Convert-ToArray -Value (Invoke-TicketOpsJson -Path "/api/tickets/$ticketId/pending-actions"))
 
     Assert-Equal -Actual $ticketDetail.category -Expected $Scenario.ExpectedCategory -Label "category"
     Assert-Equal -Actual $ticketDetail.priority -Expected $Scenario.ExpectedPriority -Label "priority"
@@ -176,7 +203,8 @@ function Invoke-Scenario {
     return [ordered]@{
         id = $Scenario.Id
         name = $Scenario.Name
-        ticketId = $ticket.id
+        runId = $RunId
+        ticketId = $ticketId
         category = $ticketDetail.category
         priority = $ticketDetail.priority
         riskLevel = $ticketDetail.riskLevel
@@ -207,6 +235,7 @@ function Write-ScenarioReports {
         "",
         "- Generated at: $($Report.generatedAt)",
         "- Base URL: $($Report.baseUrl)",
+        "- Scenario run id: $($Report.runId)",
         "- Total scenarios: $($Report.totalScenarios)",
         "- Passed scenarios: $($Report.passedScenarios)",
         "- Failed scenarios: $($Report.failedScenarios)",
@@ -328,6 +357,7 @@ try {
             $scenarioResults += [pscustomobject][ordered]@{
                 id = $scenario.Id
                 name = $scenario.Name
+                runId = $RunId
                 ticketId = $null
                 category = "UNKNOWN"
                 priority = "UNKNOWN"
@@ -350,9 +380,11 @@ try {
     $report = [pscustomobject][ordered]@{
         generatedAt = (Get-Date).ToString("o")
         baseUrl = $BaseUrl
+        runId = $RunId
         totalScenarios = @($scenarioResults).Count
         passedScenarios = $passedCount
         failedScenarios = $failedCount
+        ticketIds = @($scenarioResults | Where-Object { $_.ticketId } | ForEach-Object { $_.ticketId })
         scenarioResults = @($scenarioResults)
         boundaries = @(
             "No real LDAP / SSO / IAM / OA / ITSM integration",

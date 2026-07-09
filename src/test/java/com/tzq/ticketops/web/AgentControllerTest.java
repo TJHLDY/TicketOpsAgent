@@ -3,7 +3,6 @@ package com.tzq.ticketops.web;
 import com.tzq.ticketops.agent.AgentOrchestrator;
 import com.tzq.ticketops.agent.AgentExecutionLog;
 import com.tzq.ticketops.agent.AgentExecutionLogRepository;
-import com.tzq.ticketops.agent.AgentResponse;
 import com.tzq.ticketops.agent.TicketCategory;
 import com.tzq.ticketops.ticket.TicketService;
 import org.junit.jupiter.api.Test;
@@ -23,7 +22,7 @@ class AgentControllerTest {
                 new NoopLogRepository()
         );
 
-        AgentResponse response = controller.chat(new ChatRequest(
+        ChatResponse response = controller.chat(new ChatRequest(
                 "mock-user-001",
                 "OA 登录失败",
                 "我登录 OA 系统失败，提示账号已锁定，帮我恢复一下。"
@@ -31,6 +30,7 @@ class AgentControllerTest {
 
         assertThat(response.category()).isEqualTo(TicketCategory.ACCOUNT_LOCKED);
         assertThat(ticketService.findAll()).singleElement().satisfies(ticket -> {
+            assertThat(response.ticketId()).isEqualTo(ticket.id());
             assertThat(ticket.requesterId()).isEqualTo("mock-user-001");
             assertThat(ticket.title()).isEqualTo("OA 登录失败");
         });
