@@ -69,11 +69,42 @@ class ScenarioDemoArtifactsTest {
     }
 
     @Test
+    void scenarioDemoScriptUsesRunIdAndTicketIdFirstBinding() throws Exception {
+        String script = Files.readString(Path.of("scripts", "demo-scenarios.ps1"));
+
+        assertThat(script)
+                .contains("scenarioRunId")
+                .contains("Resolve-TicketId")
+                .contains("$agentResponse.ticketId")
+                .contains("runId = $RunId")
+                .contains("ticketIds");
+    }
+
+    @Test
+    void reproducibilityNotesDocumentRepeatableLocalRuns() throws Exception {
+        Path notesPath = Path.of("docs", "scenarios", "reproducibility-notes.md");
+
+        assertThat(notesPath).exists();
+        assertThat(Files.readString(notesPath))
+                .contains("# Scenario Demo Reproducibility Notes")
+                .contains("ticketId returned by `POST /api/agent/chat`")
+                .contains("scenarioRunId")
+                .contains("Run the script twice")
+                .contains("5 passed / 0 failed")
+                .contains("target/scenario-acceptance")
+                .contains("NOT_EXECUTED_MOCK_ONLY")
+                .contains("No real LDAP / SSO / IAM / OA / ITSM integration")
+                .contains("No LLM main / hybrid routing")
+                .contains("No pgvector / production RAG");
+    }
+
+    @Test
     void readmeLinksScenarioReportGuide() throws Exception {
         assertThat(Files.readString(Path.of("README.md")))
                 .contains("## Scenario Demo Report")
                 .contains("scripts\\demo-scenarios.ps1")
-                .contains("docs/scenarios/scenario-report-guide.md");
+                .contains("docs/scenarios/scenario-report-guide.md")
+                .contains("docs/scenarios/reproducibility-notes.md");
     }
 
     private ProcessResult run(List<String> command) throws Exception {

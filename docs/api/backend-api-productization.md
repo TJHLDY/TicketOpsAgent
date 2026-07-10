@@ -3,6 +3,7 @@
 This guide shows how to demonstrate the backend API productization stage after the app is running locally.
 
 The goal is to prove that TicketOpsAgent is no longer only an `/api/agent/chat` spike. The backend can now create a ticket, expose the persisted decision summary, show audit traces, show tool calls, show pending actions, review a pending action, and expose the latest eval report.
+`POST /api/agent/chat` returns the persisted `ticketId`, so demos and scripts can inspect the exact ticket created by the request without relying on list ordering.
 
 ## Scope
 
@@ -113,24 +114,24 @@ $body = @{
   description = "OA account locked demo"
 } | ConvertTo-Json -Compress
 
-Invoke-RestMethod -Method Post http://localhost:8080/api/agent/chat `
+$response = Invoke-RestMethod -Method Post http://localhost:8080/api/agent/chat `
   -ContentType "application/json" `
   -Body $body
 ```
 
-Find the ticket by requester:
+Read the ticket id from the response:
 
 ```powershell
-Invoke-RestMethod "http://localhost:8080/api/tickets?status=OPEN&category=ACCOUNT_LOCKED&requesterId=demo-user-001&page=0&size=1"
+$ticketId = $response.ticketId
 ```
 
 Inspect the ticket and audit evidence:
 
 ```powershell
-Invoke-RestMethod http://localhost:8080/api/tickets/{ticketId}
-Invoke-RestMethod http://localhost:8080/api/tickets/{ticketId}/trace
-Invoke-RestMethod http://localhost:8080/api/tickets/{ticketId}/tool-calls
-Invoke-RestMethod http://localhost:8080/api/tickets/{ticketId}/pending-actions
+Invoke-RestMethod "http://localhost:8080/api/tickets/$ticketId"
+Invoke-RestMethod "http://localhost:8080/api/tickets/$ticketId/trace"
+Invoke-RestMethod "http://localhost:8080/api/tickets/$ticketId/tool-calls"
+Invoke-RestMethod "http://localhost:8080/api/tickets/$ticketId/pending-actions"
 ```
 
 Approve the pending action for audit demo only:

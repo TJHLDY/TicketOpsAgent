@@ -171,15 +171,19 @@ class BackendApiProductizationTest {
     }
 
     private String createAccountLockedTicket() throws Exception {
-        mockMvc.perform(post("/api/agent/chat")
+        MvcResult result = mockMvc.perform(post("/api/agent/chat")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new ChatRequest(
                                 "mock-user-001",
                                 "OA login failed",
                                 "锁定"
                         ))))
-                .andExpect(status().isOk());
-        return ticketService.findAll().get(ticketService.findAll().size() - 1).id();
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ticketId").exists())
+                .andReturn();
+        String ticketId = objectMapper.readTree(result.getResponse().getContentAsByteArray()).get("ticketId").asText();
+        assertThat(ticketId).isEqualTo(ticketService.findAll().get(ticketService.findAll().size() - 1).id());
+        return ticketId;
     }
 
     private void createUnknownTicket() throws Exception {

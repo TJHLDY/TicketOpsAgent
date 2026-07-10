@@ -32,6 +32,7 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/
 ## Scenario Coverage
 
 The script submits one ticket per scenario through `POST /api/agent/chat`, then reads persisted evidence from ticket, trace, tool-call, and pending-action APIs.
+It binds evidence to the `ticketId` returned by `POST /api/agent/chat` first. A generated `scenarioRunId` is also added to the ticket title/description as a fallback and debugging marker for repeat local runs.
 
 | Scenario id | Expected category | Expected risk | Expected evidence |
 | --- | --- | --- | --- |
@@ -49,15 +50,17 @@ The generated JSON report contains these top-level fields:
 {
   "generatedAt": "2026-07-09T00:00:00.0000000-04:00",
   "baseUrl": "http://localhost:8080",
+  "runId": "20260709000000000",
   "totalScenarios": 5,
   "passedScenarios": 5,
   "failedScenarios": 0,
+  "ticketIds": [],
   "scenarioResults": [],
   "boundaries": []
 }
 ```
 
-Each item in `scenarioResults` includes the scenario id, ticket id, category, priority, risk level, retrieved document id, called tool, tool result, pending action, execution status, trace steps, result, and error.
+Each item in `scenarioResults` includes the scenario id, run id, ticket id, category, priority, risk level, retrieved document id, called tool, tool result, pending action, execution status, trace steps, result, and error.
 
 ## Boundaries
 
@@ -77,3 +80,4 @@ Treat a passing report as evidence that the current backend demo can be reproduc
 3. Unsafe or unknown requests do not call tools.
 4. Write-like outcomes are stored only as pending actions.
 5. The report files are generated under `target/`, so they should not be committed.
+6. Running the script twice against the same app instance should create a new `runId` and new `ticketIds` while keeping both reports at `5 passed / 0 failed`.

@@ -37,7 +37,7 @@ public class AgentController {
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8"
     )
-    public AgentResponse chat(@Valid @RequestBody ChatRequest request) {
+    public ChatResponse chat(@Valid @RequestBody ChatRequest request) {
         Ticket ticket = ticketService.createTicket(request.requesterId(), request.title(), request.description());
         AgentResponse response = agentOrchestrator.handle(new AgentRequest(
                 request.requesterId(),
@@ -56,6 +56,6 @@ public class AgentController {
                 response.toolCalls(),
                 response.pendingActions()
         ));
-        return response;
+        return ChatResponse.from(ticket.id(), response);
     }
 }

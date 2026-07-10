@@ -20,7 +20,7 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 1.1.8 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 77 automated tests passing at the latest verification.
+- 79 automated tests passing at the latest verification.
 - `AgentDecisionPort` boundary in place with deterministic routing plus DeepSeek shadow evaluation.
 - DeepSeek shadow mode calls the model, parses a candidate `AgentDecision`, validates enums/tools/pending actions/confidence, and falls back to deterministic output on validation/API errors.
 - Mock LLM shadow Eval runner covers 34 accepted, unsafe, invalid model-output, tool-argument, and pending-action mismatch cases without requiring a real API key.
@@ -134,6 +134,7 @@ See [docs/scenarios/scenario-playbook.md](docs/scenarios/scenario-playbook.md) f
 - `target/scenario-acceptance/scenario-report.md`
 
 The report summarizes `totalScenarios`, `passedScenarios`, `failedScenarios`, and per-scenario evidence such as category, risk level, retrieved SOP, read-only tool result, pending action, and `NOT_EXECUTED_MOCK_ONLY` execution status.
+It also records a generated `runId` and the current run's `ticketIds`; the script reads evidence from the `ticketId` returned by `/api/agent/chat` so repeated local runs are not confused by older tickets.
 
 Run without calling the server:
 
@@ -141,7 +142,7 @@ Run without calling the server:
 powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts\demo-scenarios.ps1 -ShowPlan
 ```
 
-See [docs/scenarios/scenario-report-guide.md](docs/scenarios/scenario-report-guide.md) for the report shape, review method, and boundaries.
+See [docs/scenarios/scenario-report-guide.md](docs/scenarios/scenario-report-guide.md) for the report shape, review method, and boundaries. See [docs/scenarios/reproducibility-notes.md](docs/scenarios/reproducibility-notes.md) for repeat-run checks.
 
 ## Architecture Overview
 
@@ -172,7 +173,7 @@ The deterministic path remains the user-facing main flow. The DeepSeek path is a
 
 Latest local validation:
 
-- `mvn test`: 77 tests PASS
+- `mvn test`: 79 tests PASS
 - `scripts\accept.ps1`: PASS
 - Secret scan: PASS
 - Shadow eval: 34 cases
@@ -366,7 +367,7 @@ Each request persists the ticket and execution evidence to `ticket`, `agent_trac
 
 ### Backend Audit APIs
 
-After creating a ticket through `/api/agent/chat`, use the ticket id from the database or ticket list API to inspect the execution evidence:
+After creating a ticket through `/api/agent/chat`, use the returned `ticketId` to inspect the execution evidence:
 
 ```powershell
 Invoke-RestMethod http://localhost:8080/api/tickets
