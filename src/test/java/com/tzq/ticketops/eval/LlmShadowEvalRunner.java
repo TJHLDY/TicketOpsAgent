@@ -1,7 +1,7 @@
 package com.tzq.ticketops.eval;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
 import com.tzq.ticketops.agent.AgentOrchestrator;
 import com.tzq.ticketops.agent.AgentRequest;
 import com.tzq.ticketops.agent.AgentResponse;
@@ -27,7 +27,9 @@ import java.util.Map;
 class LlmShadowEvalRunner {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
-            .enable(SerializationFeature.INDENT_OUTPUT);
+            .rebuild()
+            .enable(SerializationFeature.INDENT_OUTPUT)
+            .build();
 
     private final List<LlmShadowEvalCase> cases;
     private final Path reportPath;

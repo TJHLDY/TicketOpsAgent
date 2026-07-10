@@ -60,6 +60,19 @@ class BackendApiDemoArtifactsTest {
                 .contains("NOT_EXECUTED_MOCK_ONLY");
     }
 
+    @Test
+    void powershellDemoScriptsDecodeJsonResponsesAsUtf8() throws Exception {
+        String backendDemo = Files.readString(Path.of("scripts", "demo-backend-api.ps1"));
+        String scenarioDemo = Files.readString(Path.of("scripts", "demo-scenarios.ps1"));
+
+        assertThat(backendDemo)
+                .contains("ReadAsByteArrayAsync")
+                .contains("[System.Text.Encoding]::UTF8.GetString");
+        assertThat(scenarioDemo)
+                .contains("ReadAsByteArrayAsync")
+                .contains("[System.Text.Encoding]::UTF8.GetString");
+    }
+
     private ProcessResult run(List<String> command) throws Exception {
         ProcessBuilder processBuilder = new ProcessBuilder(command)
                 .redirectErrorStream(true);

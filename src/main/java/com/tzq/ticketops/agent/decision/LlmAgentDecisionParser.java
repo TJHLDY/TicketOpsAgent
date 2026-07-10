@@ -1,7 +1,7 @@
 package com.tzq.ticketops.agent.decision;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.tzq.ticketops.agent.PendingActionType;
 import com.tzq.ticketops.agent.RiskLevel;
 import com.tzq.ticketops.agent.TicketCategory;
@@ -37,7 +37,7 @@ public class LlmAgentDecisionParser {
         LlmAgentDecisionDto dto;
         try {
             dto = objectMapper.readValue(rawJson, LlmAgentDecisionDto.class);
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new LlmDecisionException("PARSE_ERROR", exception.getOriginalMessage());
         }
 

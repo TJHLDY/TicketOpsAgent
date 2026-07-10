@@ -16,11 +16,12 @@ The current MVP verifies a controllable backend agent chain:
 
 ## Current Status
 
-- Spring Boot 3.5.15.
-- Spring AI 1.1.8 BOM with DeepSeek starter support.
+- Java 21.
+- Spring Boot 4.1.0.
+- Spring AI 2.0.0 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 79 automated tests passing at the latest verification.
+- 81 automated tests passing at the latest verification.
 - `AgentDecisionPort` boundary in place with deterministic routing plus DeepSeek shadow evaluation.
 - DeepSeek shadow mode calls the model, parses a candidate `AgentDecision`, validates enums/tools/pending actions/confidence, and falls back to deterministic output on validation/API errors.
 - Mock LLM shadow Eval runner covers 34 accepted, unsafe, invalid model-output, tool-argument, and pending-action mismatch cases without requiring a real API key.
@@ -173,7 +174,7 @@ The deterministic path remains the user-facing main flow. The DeepSeek path is a
 
 Latest local validation:
 
-- `mvn test`: 79 tests PASS
+- `mvn test`: 81 tests PASS
 - `scripts\accept.ps1`: PASS
 - Secret scan: PASS
 - Shadow eval: 34 cases
@@ -408,13 +409,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\demo-scenarios.p
 
 ## Planned Next Phase
 
-The current backend phase focuses on API productization, not new AI scope.
+The backend API and local demo contracts are stable enough to begin closing the remaining AI implementation gaps in separate, verifiable stages:
 
-Recommended next work:
+1. Replace keyword/table SOP matching with a Spring AI `VectorStoreRetriever` boundary, real embeddings, source citations, and low-similarity refusal.
+2. Add controlled Spring AI 2 tool calling for the two read-only tools with explicit schemas, allowlists, argument validation, call budgets, and deterministic fallback.
+3. Add standard Spring AI/Micrometer observations without exporting prompt or tool content by default.
+4. Extend eval coverage for retrieval relevance, structured-output validity, tool selection, prompt injection, excessive agency, and fallback behavior.
+5. Build the full frontend only after the backend AI contracts and runtime evidence are stable.
 
-1. Keep backend API productization small: ticket query, trace/tool call query, pending action review, eval report query.
-2. Run `scripts\accept.ps1` after each backend API checkpoint.
-3. Build the frontend only after these read/review APIs are stable.
-4. Only consider `hybrid`, `llm`, pgvector, or real enterprise integrations in a separate phase with a new acceptance plan.
+These items are planned, not implemented. The current default remains deterministic, SOP retrieval remains keyword/table driven, and no real enterprise write operation is executed.
 
 DeepSeek keys must be supplied through environment variables, never committed.

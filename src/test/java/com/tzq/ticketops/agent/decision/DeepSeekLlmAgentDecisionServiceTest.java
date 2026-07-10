@@ -1,6 +1,6 @@
 package com.tzq.ticketops.agent.decision;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.tzq.ticketops.agent.RiskLevel;
 import com.tzq.ticketops.agent.TicketCategory;
 import org.junit.jupiter.api.Test;
