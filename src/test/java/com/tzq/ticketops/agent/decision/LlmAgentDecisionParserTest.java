@@ -4,7 +4,7 @@ import com.tzq.ticketops.agent.PendingActionType;
 import com.tzq.ticketops.agent.RiskLevel;
 import com.tzq.ticketops.agent.TicketCategory;
 import com.tzq.ticketops.agent.TicketPriority;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

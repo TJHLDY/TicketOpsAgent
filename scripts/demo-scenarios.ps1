@@ -8,6 +8,8 @@ param(
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
+Add-Type -AssemblyName System.Net.Http
+$TicketOpsHttpClient = [System.Net.Http.HttpClient]::new()
 
 $JsonReportPath = Join-Path $ReportDir "scenario-report.json"
 $MarkdownReportPath = Join-Path $ReportDir "scenario-report.md"
@@ -38,13 +40,37 @@ function Invoke-TicketOpsJson {
     )
 
     $uri = "$BaseUrl$Path"
-    if ($null -eq $Body) {
-        return Invoke-RestMethod -Method $Method -Uri $uri
-    }
+    $request = [System.Net.Http.HttpRequestMessage]::new(
+        [System.Net.Http.HttpMethod]::new($Method),
+        $uri
+    )
+    $response = $null
+    try {
+        if ($null -ne $Body) {
+            $jsonBody = $Body | ConvertTo-Json -Depth 10 -Compress
+            $jsonBytes = [System.Text.Encoding]::UTF8.GetBytes($jsonBody)
+            $request.Content = [System.Net.Http.ByteArrayContent]::new($jsonBytes)
+            $request.Content.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse(
+                "application/json; charset=utf-8"
+            )
+        }
 
-    $jsonBody = $Body | ConvertTo-Json -Depth 10 -Compress
-    $jsonBytes = [System.Text.Encoding]::UTF8.GetBytes($jsonBody)
-    return Invoke-RestMethod -Method $Method -Uri $uri -ContentType "application/json; charset=utf-8" -Body $jsonBytes
+        $response = $TicketOpsHttpClient.SendAsync($request).Result
+        $responseBytes = $response.Content.ReadAsByteArrayAsync().Result
+        $responseText = [System.Text.Encoding]::UTF8.GetString($responseBytes)
+        if (-not $response.IsSuccessStatusCode) {
+            throw "HTTP $([int]$response.StatusCode) from $uri`: $responseText"
+        }
+        if ([string]::IsNullOrWhiteSpace($responseText)) {
+            return $null
+        }
+        return $responseText | ConvertFrom-Json
+    } finally {
+        if ($null -ne $response) {
+            $response.Dispose()
+        }
+        $request.Dispose()
+    }
 }
 
 function Assert-Equal {
@@ -409,4 +435,6 @@ try {
 } catch {
     Write-Error "Scenario demo failed. Start the app with 'mvn spring-boot:run' and retry. Details: $($_.Exception.Message)"
     exit 1
+} finally {
+    $TicketOpsHttpClient.Dispose()
 }

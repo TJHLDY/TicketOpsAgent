@@ -15,6 +15,9 @@ class ReadmePublicReadinessTest {
 
         assertThat(readme)
                 .contains("A Spring Boot + Spring AI backend prototype")
+                .contains("Java 21")
+                .contains("Spring Boot 4.1.0")
+                .contains("Spring AI 2.0.0")
                 .contains("deterministic ticket triage")
                 .contains("DeepSeek shadow candidate evaluation")
                 .contains("API error contract hardening")
@@ -33,7 +36,7 @@ class ReadmePublicReadinessTest {
                 .contains("docs/scenarios/scenario-report-guide.md")
                 .contains("docs/scenarios/reproducibility-notes.md")
                 .contains("## Validation Evidence")
-                .contains("79 tests PASS")
+                .contains("81 tests PASS")
                 .contains("local validation evidence, not a production SLA")
                 .contains("## Demo Data")
                 .contains("mock-user-001")

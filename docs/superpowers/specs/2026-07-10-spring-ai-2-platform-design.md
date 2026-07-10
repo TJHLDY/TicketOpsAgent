@@ -79,4 +79,3 @@ The migration must preserve:
 - Spring AI observability: https://docs.spring.io/spring-ai/reference/observability/index.html
 - Spring AI evaluation testing: https://docs.spring.io/spring-ai/reference/api/testing.html
 - OWASP Top 10 for Agentic Applications 2026: https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/
-

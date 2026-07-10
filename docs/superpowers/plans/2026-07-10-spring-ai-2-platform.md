@@ -15,7 +15,7 @@
 **Files:**
 - Create: `src/test/java/com/tzq/ticketops/eval/PlatformBaselineContractTest.java`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 package com.tzq.ticketops.eval;
@@ -41,7 +41,7 @@ class PlatformBaselineContractTest {
 }
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `mvn test "-Dtest=PlatformBaselineContractTest"`
 
@@ -52,7 +52,7 @@ Expected: FAIL because `pom.xml` still contains Spring Boot 3.5.15, Java 17, and
 **Files:**
 - Modify: `pom.xml`
 
-- [ ] **Step 1: Change only the three platform versions**
+- [x] **Step 1: Change only the three platform versions**
 
 ```xml
 <parent>
@@ -68,7 +68,7 @@ Expected: FAIL because `pom.xml` still contains Spring Boot 3.5.15, Java 17, and
 </properties>
 ```
 
-- [ ] **Step 2: Run the targeted contract and compile path**
+- [x] **Step 2: Run the targeted contract and compile path**
 
 Run: `mvn test "-Dtest=PlatformBaselineContractTest"`
 
@@ -80,7 +80,7 @@ Expected: the contract passes and Maven compiles the application on the new depe
 - Modify: `README.md`
 - Modify: `src/test/java/com/tzq/ticketops/eval/ReadmePublicReadinessTest.java`
 
-- [ ] **Step 1: Extend the README contract**
+- [x] **Step 1: Extend the README contract**
 
 Add these exact assertions:
 
@@ -90,13 +90,13 @@ Add these exact assertions:
 .contains("Spring AI 2.0.0")
 ```
 
-- [ ] **Step 2: Run the README test and verify RED**
+- [x] **Step 2: Run the README test and verify RED**
 
 Run: `mvn test "-Dtest=ReadmePublicReadinessTest"`
 
 Expected: FAIL because the README still describes the old baseline.
 
-- [ ] **Step 3: Update the README technology stack**
+- [x] **Step 3: Update the README technology stack**
 
 ```markdown
 - Java 21.
@@ -104,7 +104,7 @@ Expected: FAIL because the README still describes the old baseline.
 - Spring AI 2.0.0 BOM with DeepSeek starter support.
 ```
 
-- [ ] **Step 4: Run the README test and verify GREEN**
+- [x] **Step 4: Run the README test and verify GREEN**
 
 Run: `mvn test "-Dtest=ReadmePublicReadinessTest"`
 
@@ -115,27 +115,31 @@ Expected: PASS.
 **Files:**
 - Modify only source or configuration files proven necessary by a failing check.
 
-- [ ] **Step 1: Run the complete test suite**
+- [x] **Step 1: Run the complete test suite**
 
 Run: `mvn test`
 
-Expected: 80 tests pass after adding `PlatformBaselineContractTest`.
+Expected: 81 tests pass after adding `PlatformBaselineContractTest` and the Windows PowerShell UTF-8 response-decoding regression test.
 
-- [ ] **Step 2: Build the executable artifact**
+- [x] **Step 2: Build the executable artifact**
 
 Run: `mvn package`
 
 Expected: BUILD SUCCESS and a runnable jar under `target/`.
 
-- [ ] **Step 3: Run repository acceptance**
+- [x] **Step 3: Run repository acceptance**
 
 Run: `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts\accept.ps1`
 
 Expected: Maven, secret scan, and shadow eval gates pass with live DeepSeek disabled.
 
-- [ ] **Step 4: Run a default-profile HTTP smoke**
+- [x] **Step 4: Run a default-profile HTTP smoke**
 
 Start the application on a free local port, call `POST /api/agent/chat` with the existing account-locked scenario, verify the response includes `ticketId`, `ACCOUNT_LOCKED`, and `NOT_EXECUTED_MOCK_ONLY` pending-action evidence, then stop the process and verify the port is free.
+
+- [x] **Step 5: Verify Windows PowerShell UTF-8 output**
+
+Run the backend demo with Windows PowerShell 5 and verify persisted Chinese ticket, SOP, trace, and pending-action fields remain readable even when a JSON response omits an explicit charset.
 
 ### Task 5: Close The Migration Evidence
 
@@ -143,17 +147,16 @@ Start the application on a free local port, call `POST /api/agent/chat` with the
 - Modify: `README.md`
 - Modify: `src/test/java/com/tzq/ticketops/eval/ReadmePublicReadinessTest.java`
 
-- [ ] **Step 1: Update validation evidence to 80 tests**
+- [x] **Step 1: Update validation evidence to 81 tests**
 
-Use the exact README text: ``- `mvn test`: 80 tests PASS``.
+Use the exact README text: ``- `mvn test`: 81 tests PASS``.
 
-- [ ] **Step 2: Run final checks**
+- [x] **Step 2: Run final checks**
 
 Run the complete tests, `scripts\accept.ps1`, `git diff --check`, and `git status --short`.
 
 Expected: all tests and acceptance gates pass; the diff check reports no errors; only planned files are modified.
 
-- [ ] **Step 3: Scan for secrets**
+- [x] **Step 3: Scan for secrets**
 
 Run a strict repository scan for API-key-shaped values while excluding `.git` and `target`. Expected: no matches. Keep only `DEEPSEEK_API_KEY` as an environment-variable name in documentation and configuration.
-
