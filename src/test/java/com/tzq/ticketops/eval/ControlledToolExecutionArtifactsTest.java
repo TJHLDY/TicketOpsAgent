@@ -34,7 +34,7 @@ class ControlledToolExecutionArtifactsTest {
 
         assertThat(readme)
                 .contains("## Controlled Read-Only Tool Execution")
-                .contains("107 tests PASS")
+                .contains("119 tests PASS")
                 .contains("ticketops.tools.max-calls-per-request")
                 .contains("requester identity")
                 .contains("zero successful tool calls and zero pending actions");

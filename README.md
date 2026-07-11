@@ -21,7 +21,7 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 2.0.0 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 107 automated tests passing at the latest verification.
+- 119 automated tests passing at the latest verification.
 - Spring AI `VectorStoreRetriever` retrieval with source citations and low-similarity refusal.
 - Offline feature-hash embedding for deterministic, key-free tests and demos.
 - Optional local ONNX Transformers profile for neural embeddings without a cloud API key.
@@ -33,6 +33,7 @@ The current MVP verifies a controllable backend agent chain:
 - DeepSeek shadow evaluation is phase-closed for this spike: evaluable, rollback-safe, and reproducible enough for review and resume/interview material.
 - Backend API productization is implemented: ticket detail/list, trace/tool call reads, pending action review, and eval report reads.
 - Backend API error contract hardening is implemented: stable JSON error codes for missing resources, invalid requests, and already reviewed pending actions.
+- Privacy-safe Micrometer metrics and local Actuator health/metrics diagnostics are implemented with bounded tags.
 - No real enterprise system integration.
 
 ## Implemented MVP Scenarios
@@ -165,6 +166,21 @@ The tools remain mock-only database reads. No write tool is registered, and pend
 
 Tool results also constrain later actions: an account-lock ticket creates `UNLOCK_ACCOUNT` only when `getAccountStatus` returns `LOCKED`. An `ACTIVE`, `MFA_REQUIRED`, or `UNKNOWN` result keeps the read evidence but creates no unlock pending action.
 
+## Privacy-Safe Observability
+
+The backend records aggregate Micrometer metrics for request duration/outcome, RAG status, controlled tool success/rejection, pending action proposals, and DeepSeek shadow outcomes. Metric tags are limited to enums, fixed outcomes, the two read-only tool names, and normalized embedding providers; requester IDs, ticket text, RAG content, tool arguments/results, and prompt and completion content remain disabled.
+
+After starting the application and creating a ticket, inspect the local endpoints:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8081/actuator/health
+Invoke-RestMethod http://127.0.0.1:8081/actuator/metrics/ticketops.agent.request
+Invoke-RestMethod http://127.0.0.1:8081/actuator/metrics/ticketops.rag.retrieval
+Invoke-RestMethod http://127.0.0.1:8081/actuator/metrics/ticketops.tool.execution
+```
+
+Only `health`, `info`, and `metrics` are exposed on the separate management server. It defaults to `127.0.0.1:8081`, so the business port does not serve `/actuator/*` and remote hosts cannot connect to the management listener. `/actuator/env` is not exposed. No Prometheus, Grafana, or external tracing backend is added in this MVP; the Actuator metrics endpoint is for local diagnostics. See [docs/observability/privacy-safe-observability.md](docs/observability/privacy-safe-observability.md) for the metric contract and privacy boundary.
+
 ## Scenario Acceptance
 
 The core backend ticket flows are covered by `ScenarioAcceptanceTest`:
@@ -225,7 +241,7 @@ The deterministic path remains the user-facing main flow. The DeepSeek path is a
 
 Latest local validation:
 
-- `mvn test`: 107 tests PASS
+- `mvn test`: 119 tests PASS
 - `scripts\accept.ps1`: PASS
 - Secret scan: PASS
 - Shadow eval: 34 cases
@@ -295,6 +311,7 @@ This repository is not a production AI Agent or production ITSM system. It does 
 - [x] Scenario demo script and report summary
 - [x] Spring AI vector RAG with source citations and low-similarity refusal
 - [x] Controlled read-only tool execution with validation, budget, and rejection traces
+- [x] Privacy-safe Micrometer metrics and local Actuator diagnostics
 
 ## Documentation
 
@@ -305,6 +322,7 @@ This repository is not a production AI Agent or production ITSM system. It does 
 - [Scenario report guide](docs/scenarios/scenario-report-guide.md): local script, generated report shape, and acceptance review method.
 - [Vector RAG guide](docs/rag/vector-rag.md): embedding providers, read-only retrieval, refusal behavior, and prototype boundary.
 - [Controlled tool execution guide](docs/tools/controlled-tool-execution.md): allowlist, typed schemas, requester binding, budget, traces, and fail-closed behavior.
+- [Privacy-safe observability guide](docs/observability/privacy-safe-observability.md): bounded metrics, local Actuator inspection, sensitive-content defaults, and non-goals.
 - [Interview notes](docs/interview/ticketops-interview-notes.md): resume-safe wording, STAR story, trade-offs, and likely interviewer questions.
 
 ## License
@@ -470,10 +488,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\demo-scenarios.p
 
 The backend API and local demo contracts are stable enough to begin closing the remaining AI implementation gaps in separate, verifiable stages:
 
-1. Add standard Spring AI/Micrometer observations without exporting prompt, retrieval content, or tool arguments by default.
-2. Extend eval coverage for structured-output validity, tool selection, prompt injection, excessive agency, retrieval quality, and fallback behavior.
-3. Replace `SimpleVectorStore` with pgvector only in a later production-oriented persistence stage.
-4. Build the full frontend only after the backend AI contracts and runtime evidence are stable.
+1. Extend eval coverage and produce a consolidated backend completion report for structured output, tool selection, prompt injection, excessive agency, retrieval quality, fallback, and observability.
+2. Replace `SimpleVectorStore` with pgvector only in a later production-oriented persistence stage.
+3. Build the full frontend only after the backend AI contracts and runtime evidence are stable.
 
 These items are planned, not implemented. The current default remains deterministic, vector retrieval remains a prototype implementation, and no real enterprise write operation is executed.
 

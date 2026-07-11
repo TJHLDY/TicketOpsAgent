@@ -5,6 +5,21 @@ spring:
     model:
       chat: none
       embedding: none
+    chat:
+      client:
+        observations:
+          log-prompt: false
+          log-completion: false
+      observations:
+        log-prompt: false
+        log-completion: false
+        include-error-logging: false
+    tools:
+      observations:
+        include-content: false
+    vectorstore:
+      observations:
+        log-query-response: false
   datasource:
     url: jdbc:h2:mem:ticketops;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false
     driver-class-name: org.h2.Driver
@@ -17,6 +32,18 @@ spring:
 logging:
   level:
     org.springframework.ai.vectorstore.SimpleVectorStore: warn
+
+management:
+  server:
+    port: ${TICKETOPS_MANAGEMENT_PORT:8081}
+    address: 127.0.0.1
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: never
 
 ticketops:
   tools:
