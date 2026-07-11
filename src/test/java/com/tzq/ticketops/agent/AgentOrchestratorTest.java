@@ -1,5 +1,9 @@
 package com.tzq.ticketops.agent;
 
+import com.tzq.ticketops.agent.decision.AgentMode;
+import com.tzq.ticketops.rag.SopSearchService;
+import com.tzq.ticketops.tools.MockAccountStatusTool;
+import com.tzq.ticketops.tools.MockUserPermissionsTool;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,6 +41,13 @@ class AgentOrchestratorTest {
                         "TOOL_CALL",
                         "DRAFT_GENERATE",
                         "PENDING_ACTION"
+                );
+        assertThat(response.traceEvents().get(1).detail())
+                .contains(
+                        "status=ACCEPTED",
+                        "source=mock-sop/account-locked.md",
+                        "threshold=0.3",
+                        "provider=offline"
                 );
     }
 
@@ -89,5 +100,40 @@ class AgentOrchestratorTest {
                         "DRAFT_GENERATE",
                         "PENDING_ACTION"
                 );
+        assertThat(response.traceEvents().get(1).detail())
+                .contains(
+                        "status=ACCEPTED",
+                        "source=mock-sop/permission-request.md",
+                        "threshold=0.3",
+                        "provider=offline"
+                );
+    }
+
+    @Test
+    void refusesLowSimilaritySopBeforeToolOrPendingAction() {
+        AgentOrchestrator orchestrator = AgentOrchestrator.createWithDecisionMode(
+                AgentMode.DETERMINISTIC,
+                null,
+                SopSearchService.createOffline(1.0),
+                new MockAccountStatusTool(),
+                new MockUserPermissionsTool()
+        );
+        AgentRequest request = new AgentRequest(
+                "mock-user-001",
+                "OA account locked",
+                "My account is locked, but the retrieval threshold is intentionally strict."
+        );
+
+        AgentResponse response = orchestrator.handle(request);
+
+        assertThat(response.category()).isEqualTo(TicketCategory.ACCOUNT_LOCKED);
+        assertThat(response.retrievedDocuments()).isEmpty();
+        assertThat(response.toolCalls()).isEmpty();
+        assertThat(response.pendingActions()).isEmpty();
+        assertThat(response.traceEvents()).extracting(TraceEvent::step)
+                .containsExactly("CLASSIFY", "RAG_REJECT");
+        assertThat(response.traceEvents().get(1).detail())
+                .contains("reason=LOW_SIMILARITY", "threshold=1.0", "provider=offline");
+        assertThat(response.replyDraft()).contains("人工");
     }
 }

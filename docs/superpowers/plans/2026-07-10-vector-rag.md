@@ -16,12 +16,12 @@
 - Modify: `src/test/java/com/tzq/ticketops/rag/SopSearchServicePersistenceTest.java`
 - Modify: `src/test/java/com/tzq/ticketops/agent/AgentOrchestratorTest.java`
 
-- [ ] Verify embeddings are numeric, normalized, deterministic, and query-dependent.
-- [ ] Verify Chinese and English account-lock text retrieves `SOP-ACCOUNT-LOCKED` with its real source.
-- [ ] Verify unrelated text returns `LOW_SIMILARITY` rather than a fallback document.
-- [ ] Verify database document changes refresh the vector index.
-- [ ] Verify low confidence prevents tool calls and pending actions.
-- [ ] Run targeted tests and confirm RED because vector components/results do not exist.
+- [x] Verify embeddings are numeric, normalized, deterministic, and query-dependent.
+- [x] Verify Chinese and English account-lock text retrieves `SOP-ACCOUNT-LOCKED` with its real source.
+- [x] Verify unrelated text returns `LOW_SIMILARITY` rather than a fallback document.
+- [x] Verify database document changes refresh the vector index.
+- [x] Verify low confidence prevents tool calls and pending actions.
+- [x] Run targeted tests and confirm RED because vector components/results do not exist.
 
 ### Task 2: Add Spring AI vector and ONNX dependencies
 
@@ -30,10 +30,10 @@
 - Modify: `src/main/resources/application.yml`
 - Create: `src/main/resources/application-onnx.yml`
 
-- [ ] Add `spring-ai-vector-store` and `spring-ai-starter-model-transformers` under the existing BOM.
-- [ ] Keep the default provider offline and set explicit top-k/threshold configuration.
-- [ ] Add an `onnx` profile enabling the transformers embedding model and local cache.
-- [ ] Compile and inspect the resolved dependency tree.
+- [x] Add `spring-ai-vector-store` under the existing BOM and place the large `spring-ai-starter-model-transformers` runtime behind Maven profile `onnx`.
+- [x] Keep the default provider offline and set explicit top-k/threshold configuration.
+- [x] Add an `onnx` profile enabling the transformers embedding model and local cache.
+- [x] Compile and inspect the resolved dependency tree.
 
 ### Task 3: Implement document source, embeddings, and vector index
 
@@ -46,11 +46,11 @@
 - Create: `src/main/java/com/tzq/ticketops/rag/SopVectorStoreConfiguration.java`
 - Create: `src/main/java/com/tzq/ticketops/rag/RefreshingSopVectorStoreRetriever.java`
 
-- [ ] Implement deterministic word/CJK n-gram feature embeddings.
-- [ ] Build `SimpleVectorStore` from the selected `EmbeddingModel`.
-- [ ] Convert SOP rows to Spring AI `Document` with ID/title/source metadata.
-- [ ] Refresh only when the source fingerprint changes.
-- [ ] Expose only `VectorStoreRetriever` to the search service.
+- [x] Implement deterministic word/CJK n-gram feature embeddings.
+- [x] Build `SimpleVectorStore` from the selected `EmbeddingModel`.
+- [x] Convert SOP rows to Spring AI `Document` with ID/title/source metadata.
+- [x] Refresh only when the source fingerprint changes.
+- [x] Expose only `VectorStoreRetriever` to the search service.
 
 ### Task 4: Replace keyword search and enforce refusal
 
@@ -60,12 +60,12 @@
 - Modify: `src/main/java/com/tzq/ticketops/rag/SopSearchService.java`
 - Modify: `src/main/java/com/tzq/ticketops/agent/AgentOrchestrator.java`
 
-- [ ] Search top-k 1 through `VectorStoreRetriever`.
-- [ ] Return citation and real score for accepted candidates.
-- [ ] Return `LOW_SIMILARITY` / `NO_DOCUMENTS` with observed evidence for rejection.
-- [ ] Add source, score, threshold, and provider to accepted trace.
-- [ ] Stop before tools/pending actions on rejected retrieval.
-- [ ] Run targeted tests and confirm GREEN.
+- [x] Search top-k 1 through `VectorStoreRetriever`.
+- [x] Return citation and real score for accepted candidates.
+- [x] Return `LOW_SIMILARITY` / `NO_DOCUMENTS` with observed evidence for rejection.
+- [x] Add source, score, threshold, and provider to accepted trace.
+- [x] Stop before tools/pending actions on rejected retrieval.
+- [x] Run targeted tests and confirm GREEN.
 
 ### Task 5: Update mock SOP content, docs, and eval evidence
 
@@ -75,20 +75,20 @@
 - Modify: `src/test/java/com/tzq/ticketops/eval/ReadmePublicReadinessTest.java`
 - Create: `docs/rag/vector-rag.md`
 
-- [ ] Make mock SOP content explicit enough for Chinese and English retrieval without query-side ID selection.
-- [ ] Document offline vs ONNX providers and the SimpleVectorStore boundary.
-- [ ] Document source citations and refusal behavior.
-- [ ] Update the verified test count only after the final suite passes.
+- [x] Make mock SOP content explicit enough for Chinese and English retrieval without query-side ID selection.
+- [x] Document offline vs ONNX providers and the SimpleVectorStore boundary.
+- [x] Document source citations and refusal behavior.
+- [x] Update the verified test count only after the final suite passes.
 
 ### Task 6: Verify default and ONNX paths
 
-- [ ] Run targeted vector tests.
-- [ ] Run `mvn test` and `mvn package`.
-- [ ] Run `scripts\accept.ps1`.
-- [ ] Run default live backend and five-scenario smoke.
-- [ ] Run ONNX profile retrieval smoke and capture provider/ID/source/score/refusal evidence.
-- [ ] Run strict key-shaped scan and `git diff --check`.
-- [ ] Update README evidence and mark this plan complete.
+- [x] Run targeted vector tests.
+- [x] Run `mvn test` and `mvn package`.
+- [x] Run `scripts\accept.ps1`.
+- [x] Run default live backend and five-scenario smoke.
+- [x] Run ONNX profile retrieval smoke and capture provider/ID/source/score/refusal evidence.
+- [x] Run strict key-shaped scan and `git diff --check`.
+- [x] Update README evidence and mark this plan complete.
 
 ### Task 7: Publish and record
 

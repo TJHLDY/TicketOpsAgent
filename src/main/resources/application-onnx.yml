@@ -1,0 +1,22 @@
+spring:
+  config:
+    activate:
+      on-profile: onnx
+  ai:
+    model:
+      embedding: transformers
+    embedding:
+      transformer:
+        onnx:
+          model-uri: https://media.githubusercontent.com/media/spring-projects/spring-ai/refs/tags/v2.0.0/models/spring-ai-transformers/src/main/resources/onnx/all-MiniLM-L6-v2/model.onnx
+        cache:
+          enabled: true
+          directory: ${TICKETOPS_ONNX_CACHE:${java.io.tmpdir}/ticketops-onnx-model}
+        tokenizer:
+          uri: https://raw.githubusercontent.com/spring-projects/spring-ai/v2.0.0/models/spring-ai-transformers/src/main/resources/onnx/all-MiniLM-L6-v2/tokenizer.json
+          options:
+            padding: true
+
+ticketops:
+  rag:
+    embedding-provider: onnx

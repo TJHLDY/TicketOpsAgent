@@ -2,13 +2,13 @@
 
 A Spring Boot + Spring AI backend prototype for enterprise IT account and permission tickets.
 
-The project demonstrates deterministic ticket triage, SOP retrieval, read-only tool calls, pending action review, audit traces, and DeepSeek shadow candidate evaluation with Java-side DTO parsing, validation, fallback, and acceptance reporting.
+The project demonstrates deterministic ticket triage, embedding-based SOP retrieval, read-only tool calls, pending action review, audit traces, and DeepSeek shadow candidate evaluation with Java-side DTO parsing, validation, fallback, and acceptance reporting.
 
 The current MVP verifies a controllable backend agent chain:
 
 1. Create an `OPEN` ticket from requester/title/description.
 2. Classify account and permission-related ticket text.
-3. Retrieve an SOP/FAQ reference from `sop_document`.
+3. Embed the retrieval query and retrieve an SOP/FAQ source citation from a Spring AI vector store.
 4. Call read-only mock tools backed by database tables.
 5. Generate an internal suggestion, user reply draft, pending action, and trace events.
 6. Persist ticket, trace, tool call, and pending action evidence.
@@ -21,7 +21,10 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 2.0.0 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 81 automated tests passing at the latest verification.
+- 91 automated tests passing at the latest verification.
+- Spring AI `VectorStoreRetriever` retrieval with source citations and low-similarity refusal.
+- Offline feature-hash embedding for deterministic, key-free tests and demos.
+- Optional local ONNX Transformers profile for neural embeddings without a cloud API key.
 - `AgentDecisionPort` boundary in place with deterministic routing plus DeepSeek shadow evaluation.
 - DeepSeek shadow mode calls the model, parses a candidate `AgentDecision`, validates enums/tools/pending actions/confidence, and falls back to deterministic output on validation/API errors.
 - Mock LLM shadow Eval runner covers 34 accepted, unsafe, invalid model-output, tool-argument, and pending-action mismatch cases without requiring a real API key.
@@ -78,7 +81,9 @@ Expected chain:
 - Default agent routing is deterministic.
 - `ticketops.agent.mode=shadow` keeps deterministic user-facing output and records shadow decision traces.
 - The `deepseek` profile enables a Spring AI-backed shadow decision service. Invalid or unsafe model output is recorded as `LLM_SHADOW_FAILED` and does not affect the user-facing response.
-- Current SOP retrieval is keyword/table driven, not vector RAG.
+- SOP retrieval uses Spring AI `SimpleVectorStore` behind a read-only `VectorStoreRetriever`; `SimpleVectorStore` is a prototype/demo implementation, not production pgvector.
+- The default offline feature-hash embedding is deterministic test/demo infrastructure, not a trained semantic model. The optional `onnx` profile uses local ONNX Transformers.
+- Low-confidence retrieval stops before tool calls and pending actions and records `RAG_REJECT`.
 
 ## Quick Start
 
@@ -113,6 +118,30 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts\
 ```
 
 Do not commit API keys. DeepSeek keys must be supplied through environment variables only.
+
+## Vector RAG
+
+The default path indexes the mock `sop_document` rows into Spring AI `SimpleVectorStore` and searches them through the read-only `VectorStoreRetriever` interface. Accepted results return the document ID, title, source citation, and actual similarity score. Retrieval traces also record the threshold and embedding provider.
+
+Default offline mode is repeatable and key-free:
+
+```yaml
+ticketops:
+  rag:
+    embedding-provider: offline
+    similarity-threshold: 0.30
+    top-k: 1
+```
+
+The offline feature-hash embedding produces real numeric vectors for deterministic tests, but it is intentionally not presented as a trained semantic model. To use Spring AI's local neural embedding model, activate both the Maven and Spring `onnx` profiles:
+
+```powershell
+mvn -Ponnx spring-boot:run "-Dspring-boot.run.profiles=onnx"
+```
+
+The first ONNX run may download and cache model resources. It requires no embedding API key. Both providers use the same retrieval/result contract.
+
+When the best score is below `ticketops.rag.similarity-threshold`, the Agent returns a human-transfer draft, writes `RAG_REJECT`, and creates no tool call or pending action. See [docs/rag/vector-rag.md](docs/rag/vector-rag.md) for design, commands, evidence, and the explicit not production boundary.
 
 ## Scenario Acceptance
 
@@ -153,7 +182,7 @@ See [docs/scenarios/scenario-report-guide.md](docs/scenarios/scenario-report-gui
       v
 Deterministic Decision Service  ---> user-facing response
       |
-      +--> SOP Retrieval
+      +--> Query Rewrite / Embedding / VectorStoreRetriever
       +--> Read-only Tools
       +--> Pending Action Proposal
       +--> Trace / Tool Log / Pending Action
@@ -174,7 +203,7 @@ The deterministic path remains the user-facing main flow. The DeepSeek path is a
 
 Latest local validation:
 
-- `mvn test`: 81 tests PASS
+- `mvn test`: 91 tests PASS
 - `scripts\accept.ps1`: PASS
 - Secret scan: PASS
 - Shadow eval: 34 cases
@@ -184,6 +213,9 @@ Latest local validation:
 - Optional live smoke: supported
 - Demo script: 7-step backend flow PASS
 - Scenario demo report: 5 scenarios PASS
+- Vector retrieval contracts: bilingual retrieval, database refresh, source citation, and low-similarity refusal PASS
+- Local ONNX smoke: Chinese account-lock query retrieved `SOP-ACCOUNT-LOCKED` from `mock-sop/account-locked.md` with provider `onnx` and score `0.568`
+- ONNX refusal smoke at threshold `0.95`: `RAG_REJECT`, 0 tool calls, and 0 pending actions
 
 These numbers are local validation evidence, not a production SLA.
 
@@ -238,6 +270,7 @@ This repository is not a production AI Agent or production ITSM system. It does 
 - [x] API error contract hardening
 - [x] Scenario acceptance suite
 - [x] Scenario demo script and report summary
+- [x] Spring AI vector RAG with source citations and low-similarity refusal
 
 ## Documentation
 
@@ -246,6 +279,7 @@ This repository is not a production AI Agent or production ITSM system. It does 
 - [Backend API productization guide](docs/api/backend-api-productization.md): local demo flow for ticket, trace, tool call, pending action review, and eval report APIs.
 - [Scenario acceptance playbook](docs/scenarios/scenario-playbook.md): accepted business scenarios, expected evidence, and non-goals.
 - [Scenario report guide](docs/scenarios/scenario-report-guide.md): local script, generated report shape, and acceptance review method.
+- [Vector RAG guide](docs/rag/vector-rag.md): embedding providers, read-only retrieval, refusal behavior, and prototype boundary.
 - [Interview notes](docs/interview/ticketops-interview-notes.md): resume-safe wording, STAR story, trade-offs, and likely interviewer questions.
 
 ## License
@@ -411,12 +445,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\demo-scenarios.p
 
 The backend API and local demo contracts are stable enough to begin closing the remaining AI implementation gaps in separate, verifiable stages:
 
-1. Replace keyword/table SOP matching with a Spring AI `VectorStoreRetriever` boundary, real embeddings, source citations, and low-similarity refusal.
-2. Add controlled Spring AI 2 tool calling for the two read-only tools with explicit schemas, allowlists, argument validation, call budgets, and deterministic fallback.
-3. Add standard Spring AI/Micrometer observations without exporting prompt or tool content by default.
-4. Extend eval coverage for retrieval relevance, structured-output validity, tool selection, prompt injection, excessive agency, and fallback behavior.
+1. Add controlled Spring AI 2 tool calling for the two read-only tools with explicit schemas, allowlists, argument validation, call budgets, and deterministic fallback.
+2. Add standard Spring AI/Micrometer observations without exporting prompt or tool content by default.
+3. Extend eval coverage for structured-output validity, tool selection, prompt injection, excessive agency, retrieval quality, and fallback behavior.
+4. Replace `SimpleVectorStore` with pgvector only in a later production-oriented persistence stage.
 5. Build the full frontend only after the backend AI contracts and runtime evidence are stable.
 
-These items are planned, not implemented. The current default remains deterministic, SOP retrieval remains keyword/table driven, and no real enterprise write operation is executed.
+These items are planned, not implemented. The current default remains deterministic, vector retrieval remains a prototype implementation, and no real enterprise write operation is executed.
 
 DeepSeek keys must be supplied through environment variables, never committed.
