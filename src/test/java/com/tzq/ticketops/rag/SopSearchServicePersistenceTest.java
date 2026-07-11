@@ -87,5 +87,37 @@ class SopSearchServicePersistenceTest {
             assertThat(reference.id()).isEqualTo("SOP-PERMISSION-REQUEST");
             assertThat(reference.source()).isEqualTo("db-sop/new-permission.md");
         });
+        String staleResultId = sopSearchService.search("account locked")
+                .reference()
+                .map(SopReference::id)
+                .orElse("");
+        assertThat(staleResultId).isNotEqualTo("SOP-ACCOUNT-LOCKED");
+    }
+
+    @Test
+    void retrievesLaterSectionWithChunkLevelCitation() {
+        String relevantSection = "emergency account locked recovery requires identity verification before unlock review. ";
+        String content = ("general retention policy handbook overview. ").repeat(60)
+                + relevantSection.repeat(10);
+        jdbcTemplate.update(
+                "insert into sop_document(id, title, source, content) values (?, ?, ?, ?)",
+                "SOP-LONG-ACCOUNT",
+                "Long account operations handbook",
+                "db-sop/long-account-operations.md",
+                content
+        );
+
+        SopSearchResult result = sopSearchService.search(
+                relevantSection
+        );
+
+        assertThat(result.status()).isEqualTo(SopSearchStatus.ACCEPTED);
+        assertThat(result.reference()).get().satisfies(reference -> {
+            assertThat(reference.id()).isEqualTo("SOP-LONG-ACCOUNT");
+            assertThat(reference.chunkId()).startsWith("SOP-LONG-ACCOUNT#chunk-");
+            assertThat(reference.chunkIndex()).isGreaterThan(0);
+            assertThat(reference.totalChunks()).isGreaterThan(1);
+            assertThat(reference.source()).isEqualTo("db-sop/long-account-operations.md");
+        });
     }
 }

@@ -56,6 +56,9 @@ class AgentOrchestratorTest {
                 .contains(
                         "status=ACCEPTED",
                         "source=mock-sop/account-locked.md",
+                        "chunkId=SOP-ACCOUNT-LOCKED#chunk-0",
+                        "chunkIndex=0",
+                        "totalChunks=1",
                         "threshold=0.3",
                         "provider=offline"
                 );

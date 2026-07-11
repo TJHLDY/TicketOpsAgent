@@ -45,6 +45,9 @@ class SopVectorRetrievalTest {
         assertThat(result.reference()).get().satisfies(reference -> {
             assertThat(reference.id()).isEqualTo("SOP-ACCOUNT-LOCKED");
             assertThat(reference.source()).isEqualTo("mock-sop/account-locked.md");
+            assertThat(reference.chunkId()).isEqualTo("SOP-ACCOUNT-LOCKED#chunk-0");
+            assertThat(reference.chunkIndex()).isZero();
+            assertThat(reference.totalChunks()).isEqualTo(1);
             assertThat(reference.similarity()).isGreaterThanOrEqualTo(result.threshold());
         });
     }

@@ -21,8 +21,9 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 2.0.0 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 126 automated tests passing at the latest verification.
+- 131 automated tests passing at the latest verification.
 - Spring AI `VectorStoreRetriever` retrieval with source citations and low-similarity refusal.
+- Spring AI `TokenTextSplitter` SOP chunking with deterministic chunk IDs and chunk-level citations.
 - Offline feature-hash embedding for deterministic, key-free tests and demos.
 - Optional local ONNX Transformers profile for neural embeddings without a cloud API key.
 - Backend-owned `ReadOnlyToolExecutor` with exact schemas, requester identity binding, category policy, app-code normalization, and one-call budget.
@@ -147,6 +148,14 @@ The first ONNX run may download and cache model resources. It requires no embedd
 
 When the best score is below `ticketops.rag.similarity-threshold`, the Agent returns a human-transfer draft, writes `RAG_REJECT`, and creates no tool call or pending action. See [docs/rag/vector-rag.md](docs/rag/vector-rag.md) for design, commands, evidence, and the explicit not production boundary.
 
+## SOP Document Chunking
+
+Each `sop_document` row is transformed with Spring AI `TokenTextSplitter` before embedding. The prototype uses a 256-token target size and rebuilds splitter output with deterministic IDs such as `SOP-ACCOUNT-LOCKED#chunk-0`.
+
+Every chunk carries the parent SOP ID, title, source, `chunkIndex`, and `totalChunks`. Accepted `retrievedDocuments` citations and `RAG_RETRIEVE` traces expose `chunkId`, `chunkIndex`, and `totalChunks` while keeping the existing parent document ID and source citation.
+
+Short mock SOPs remain one chunk. Long SOPs can match a later section without presenting that section as a separate source document. Chunks are derived in-memory index artifacts; this is not a production indexing pipeline, persistent vector database, reranker, or multi-document synthesis layer.
+
 ## Controlled Read-Only Tool Execution
 
 Both user-facing read-only calls run through `ReadOnlyToolExecutor`; category handlers no longer invoke concrete mock tools directly. The executor owns the allowlist, exact argument sets, typed DTO conversion, requester identity binding, application-code normalization, category-to-tool policy, and invocation.
@@ -254,7 +263,7 @@ The deterministic path remains the user-facing main flow. The DeepSeek path is a
 
 Latest local validation:
 
-- `mvn test`: 126 tests PASS
+- `mvn test`: 131 tests PASS
 - `scripts\accept.ps1`: PASS
 - Secret scan: PASS
 - Shadow eval: 34 cases
@@ -325,6 +334,7 @@ This repository is not a production AI Agent or production ITSM system. It does 
 - [x] Spring AI vector RAG with source citations and low-similarity refusal
 - [x] Controlled read-only tool execution with validation, budget, and rejection traces
 - [x] Persist internal suggestions and user reply drafts as read-only audit evidence
+- [x] Spring AI TokenTextSplitter SOP chunking with chunk-level citations
 - [x] Privacy-safe Micrometer metrics and local Actuator diagnostics
 
 ## Documentation

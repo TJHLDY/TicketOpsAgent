@@ -41,7 +41,7 @@ class ReadmePublicReadinessTest {
                 .contains("docs/scenarios/scenario-report-guide.md")
                 .contains("docs/scenarios/reproducibility-notes.md")
                 .contains("## Validation Evidence")
-                .contains("126 tests PASS")
+                .contains("131 tests PASS")
                 .contains("## Controlled Read-Only Tool Execution")
                 .contains("TOOL_REJECT")
                 .contains("local validation evidence, not a production SLA")
