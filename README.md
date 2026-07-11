@@ -21,7 +21,7 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 2.0.0 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 131 automated tests passing at the latest verification.
+- 133 automated tests passing at the latest verification.
 - Spring AI `VectorStoreRetriever` retrieval with source citations and low-similarity refusal.
 - Spring AI `TokenTextSplitter` SOP chunking with deterministic chunk IDs and chunk-level citations.
 - Offline feature-hash embedding for deterministic, key-free tests and demos.
@@ -263,7 +263,7 @@ The deterministic path remains the user-facing main flow. The DeepSeek path is a
 
 Latest local validation:
 
-- `mvn test`: 131 tests PASS
+- `mvn test`: 133 tests PASS
 - `scripts\accept.ps1`: PASS
 - Secret scan: PASS
 - Shadow eval: 34 cases
@@ -297,6 +297,14 @@ http://localhost:8080/demo-console.html
 The console demonstrates ticket creation through `/api/agent/chat`, ticket detail lookup, trace timeline, read-only tool call evidence, pending action review with `NOT_EXECUTED_MOCK_ONLY`, and eval report summary.
 
 The console is a local static demo page only. It does not add login, RBAC, real enterprise integrations, real execution, LLM main decisioning, hybrid mode, or production RAG.
+
+## Backend MVP Completion
+
+The scoped backend MVP is complete: ticket creation and triage, chunked SOP retrieval and refusal, controlled read-only mock tools, persisted drafts, audit-only pending actions, execution evidence, local observability, Eval cases, and reproducible scenario reports are implemented and verified.
+
+This is still a mock-only prototype with a deterministic user-facing path and a DeepSeek shadow-only candidate path. It is not a production ITSM system and does not execute any real account or permission operation.
+
+See [the backend MVP completion report](docs/completion/backend-mvp-completion-report.md) for the original requirement matrix, implementation evidence, deviations, commands, resume-safe claim, and boundaries.
 
 ## Demo Data
 
@@ -336,6 +344,7 @@ This repository is not a production AI Agent or production ITSM system. It does 
 - [x] Persist internal suggestions and user reply drafts as read-only audit evidence
 - [x] Spring AI TokenTextSplitter SOP chunking with chunk-level citations
 - [x] Privacy-safe Micrometer metrics and local Actuator diagnostics
+- [x] Consolidated backend MVP completion report
 
 ## Documentation
 
@@ -348,6 +357,7 @@ This repository is not a production AI Agent or production ITSM system. It does 
 - [Controlled tool execution guide](docs/tools/controlled-tool-execution.md): allowlist, typed schemas, requester binding, budget, traces, and fail-closed behavior.
 - [Privacy-safe observability guide](docs/observability/privacy-safe-observability.md): bounded metrics, local Actuator inspection, sensitive-content defaults, and non-goals.
 - [Agent draft persistence guide](docs/api/agent-draft-persistence.md): atomic storage, read API, and draft-only boundary.
+- [Backend MVP completion report](docs/completion/backend-mvp-completion-report.md): initial requirement matrix, evidence, deviations, safe claims, and boundaries.
 - [Interview notes](docs/interview/ticketops-interview-notes.md): resume-safe wording, STAR story, trade-offs, and likely interviewer questions.
 
 ## License
@@ -478,6 +488,7 @@ Invoke-RestMethod http://localhost:8080/api/tickets/{ticketId}
 Invoke-RestMethod http://localhost:8080/api/tickets/{ticketId}/trace
 Invoke-RestMethod http://localhost:8080/api/tickets/{ticketId}/tool-calls
 Invoke-RestMethod http://localhost:8080/api/tickets/{ticketId}/pending-actions
+Invoke-RestMethod http://localhost:8080/api/tickets/{ticketId}/messages
 Invoke-RestMethod http://localhost:8080/api/eval/reports/latest
 ```
 
@@ -511,12 +522,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\demo-scenarios.p
 
 ## Planned Next Phase
 
-The backend API and local demo contracts are stable enough to begin closing the remaining AI implementation gaps in separate, verifiable stages:
+The scoped backend MVP and consolidated completion report are complete. The next project-construction stage is a complete operator-facing frontend over the existing read and review APIs.
 
-1. Extend eval coverage and produce a consolidated backend completion report for structured output, tool selection, prompt injection, excessive agency, retrieval quality, fallback, and observability.
-2. Replace `SimpleVectorStore` with pgvector only in a later production-oriented persistence stage.
-3. Build the full frontend only after the backend AI contracts and runtime evidence are stable.
-
-These items are planned, not implemented. The current default remains deterministic, vector retrieval remains a prototype implementation, and no real enterprise write operation is executed.
+Production pgvector, real enterprise integrations, LLM main/hybrid decisioning, and real write execution remain separate future projects. The current default remains deterministic, vector retrieval remains prototype infrastructure, and no real enterprise write operation is executed.
 
 DeepSeek keys must be supplied through environment variables, never committed.
