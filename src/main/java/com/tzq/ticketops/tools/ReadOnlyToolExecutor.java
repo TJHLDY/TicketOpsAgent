@@ -38,8 +38,8 @@ public class ReadOnlyToolExecutor {
             MockUserPermissionsTool permissionsTool,
             @Value("${ticketops.tools.max-calls-per-request:1}") int maxCallsPerRequest
     ) {
-        if (maxCallsPerRequest < 1) {
-            throw new IllegalArgumentException("maxCallsPerRequest must be at least 1");
+        if (maxCallsPerRequest != 1) {
+            throw new IllegalArgumentException("maxCallsPerRequest must equal 1 for single-tool execution");
         }
         this.accountStatusTool = accountStatusTool;
         this.permissionsTool = permissionsTool;
@@ -55,7 +55,7 @@ public class ReadOnlyToolExecutor {
         if (safeIntents.isEmpty()) {
             throw rejected(ToolRejectionReason.MISSING_TOOL_INTENT, "none");
         }
-        if (safeIntents.size() > maxCallsPerRequest || safeIntents.size() != 1) {
+        if (safeIntents.size() > maxCallsPerRequest) {
             throw rejected(ToolRejectionReason.TOOL_BUDGET_EXCEEDED, firstToolName(safeIntents));
         }
 

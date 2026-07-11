@@ -146,6 +146,9 @@ class ReadOnlyToolExecutorTest {
 
     @Test
     void rejectsMissingIntentAndBudgetOverflowBeforeInvocation() {
+        assertThatThrownBy(() -> new ReadOnlyToolExecutor(accountStatusTool, permissionsTool, 2))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must equal 1");
         assertRejected(
                 List.of(),
                 "mock-user-001",

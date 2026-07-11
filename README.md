@@ -151,7 +151,7 @@ Both user-facing read-only calls run through `ReadOnlyToolExecutor`; category ha
 
 The default call budget is explicit:
 
-The property `ticketops.tools.max-calls-per-request` defaults to `1`.
+The property `ticketops.tools.max-calls-per-request` is fixed at `1` for the current single-tool MVP. Startup rejects any other value instead of pretending to support a multi-tool loop.
 
 ```yaml
 ticketops:

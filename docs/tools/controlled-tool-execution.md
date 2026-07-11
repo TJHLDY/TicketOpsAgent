@@ -34,7 +34,7 @@ ticketops:
     max-calls-per-request: 1
 ```
 
-`ReadOnlyToolExecutor.executeSingle` rejects empty intent lists, duplicate intents, and any request that exceeds `ticketops.tools.max-calls-per-request`. There is no autonomous tool loop.
+`ReadOnlyToolExecutor.executeSingle` rejects empty intent lists, duplicate intents, and any request that exceeds `ticketops.tools.max-calls-per-request`. The current implementation accepts only the configured value `1` and fails application startup for any other value. There is no autonomous or multi-tool loop.
 
 ## Traces and failure behavior
 
