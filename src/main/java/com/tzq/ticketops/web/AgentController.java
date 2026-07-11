@@ -61,7 +61,9 @@ public class AgentController {
                     ticket.id(),
                     response.traceEvents(),
                     response.toolCalls(),
-                    response.pendingActions()
+                    response.pendingActions(),
+                    response.suggestion(),
+                    response.replyDraft()
             ));
             ChatResponse chatResponse = ChatResponse.from(ticket.id(), response);
             observation.complete(
