@@ -87,10 +87,13 @@ public class SopSearchService {
         }
 
         SopReference reference = new SopReference(
+                metadata(best, SopDocumentChunker.SOP_ID_METADATA),
+                metadata(best, SopDocumentChunker.TITLE_METADATA),
+                metadata(best, SopDocumentChunker.SOURCE_METADATA),
+                score,
                 best.getId(),
-                metadata(best, RefreshingSopVectorStoreRetriever.TITLE_METADATA),
-                metadata(best, RefreshingSopVectorStoreRetriever.SOURCE_METADATA),
-                score
+                integerMetadata(best, SopDocumentChunker.CHUNK_INDEX_METADATA),
+                integerMetadata(best, SopDocumentChunker.TOTAL_CHUNKS_METADATA)
         );
         return new SopSearchResult(
                 SopSearchStatus.ACCEPTED,
@@ -107,6 +110,17 @@ public class SopSearchService {
             throw new IllegalStateException("Retrieved SOP document is missing metadata: " + key);
         }
         return value.toString();
+    }
+
+    private int integerMetadata(Document document, String key) {
+        Object value = document.getMetadata().get(key);
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value == null) {
+            throw new IllegalStateException("Retrieved SOP document is missing metadata: " + key);
+        }
+        return Integer.parseInt(value.toString());
     }
 
     private static VectorStoreRetriever offlineRetriever() {

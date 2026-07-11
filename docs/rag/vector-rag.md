@@ -5,15 +5,30 @@ TicketOpsAgent retrieves mock IT support SOP documents through Spring AI `Vector
 ## Runtime flow
 
 1. `JdbcSopDocumentSource` reads the current `sop_document` rows.
-2. `RefreshingSopVectorStoreRetriever` compares the current rows with the indexed snapshot and refreshes the prototype index only when they change.
-3. The selected `EmbeddingModel` converts SOP text and the rewritten query into numeric vectors.
-4. Spring AI `SimpleVectorStore` performs cosine-similarity search.
-5. `SopSearchService` returns the best document only when its score reaches the threshold.
-6. Accepted retrieval produces `RAG_RETRIEVE`; rejected retrieval produces `RAG_REJECT` before any tool or pending action.
+2. `SopDocumentChunker` applies Spring AI `TokenTextSplitter` with a 256-token target size.
+3. Splitter output is rebuilt with deterministic `{sopId}#chunk-{index}` IDs and parent citation metadata.
+4. `RefreshingSopVectorStoreRetriever` compares the current rows with the indexed snapshot and refreshes the prototype chunk index only when they change.
+5. The selected `EmbeddingModel` converts SOP chunks and the rewritten query into numeric vectors.
+6. Spring AI `SimpleVectorStore` performs cosine-similarity search.
+7. `SopSearchService` returns the best chunk only when its score reaches the threshold.
+8. Accepted retrieval produces `RAG_RETRIEVE`; rejected retrieval produces `RAG_REJECT` before any tool or pending action.
 
 `SopSearchService` depends on the read-only `VectorStoreRetriever` interface. Mutable indexing is encapsulated inside the refreshing adapter.
 
 The JDBC source fails closed: an empty `sop_document` table yields `NO_DOCUMENTS`; it never silently substitutes built-in documents. Built-in documents are used only by the explicit no-Spring offline factory for unit/demo construction.
+
+## Document chunking
+
+`SopDocumentChunker` uses Spring AI `TokenTextSplitter` with a 256-token target, a small minimum embeddable chunk, separators retained, and a bounded maximum chunk count. The splitter preserves source metadata; TicketOpsAgent then assigns deterministic chunk IDs so index refresh can delete exactly the old derived chunks.
+
+Chunk metadata includes:
+
+- parent SOP ID;
+- SOP title and source;
+- `chunkIndex`;
+- `totalChunks`.
+
+A short SOP produces one chunk. A longer SOP can produce multiple chunks, and a query may cite a later section while `SopReference.id` continues to identify the parent SOP. Chunk rows are derived index artifacts and are not stored as authoritative SOP records.
 
 ## Providers
 
@@ -50,11 +65,12 @@ An accepted `RAG_RETRIEVE` trace records:
 - `status=ACCEPTED`;
 - document ID and title;
 - `source` citation;
+- `chunkId`, `chunkIndex`, and `totalChunks`;
 - actual similarity score;
 - configured threshold;
 - embedding provider.
 
-The user-facing `retrievedDocuments` field returns the same ID/title/source/score citation.
+The user-facing `retrievedDocuments` field returns the same parent ID/title/source/score citation plus the matched chunk identity.
 
 ## Low-similarity refusal
 
@@ -74,7 +90,7 @@ mvn test "-Dtest=OfflineFeatureHashEmbeddingModelTest,SopVectorRetrievalTest,Sop
 powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts\accept.ps1
 ```
 
-The vector tests cover bilingual account-lock retrieval, permission and MFA retrieval, unrelated-query refusal, database refresh, source citation, and the no-tool/no-pending-action refusal boundary.
+The vector tests cover bilingual account-lock retrieval, permission and MFA retrieval, unrelated-query refusal, database refresh, stale-chunk deletion, deterministic chunk metadata, later-section retrieval, source citation, and the no-tool/no-pending-action refusal boundary.
 
 Latest local ONNX smoke evidence:
 
@@ -86,4 +102,4 @@ Latest local ONNX smoke evidence:
 
 ## Boundary
 
-`SimpleVectorStore` is explicitly not production infrastructure. It is appropriate only for this local prototype and automated tests. The production-oriented follow-up is pgvector behind the same `VectorStoreRetriever` boundary, with schema/versioned indexing and operational monitoring.
+`SimpleVectorStore` is explicitly not production infrastructure. It is appropriate only for this local prototype and automated tests. This is not a production indexing pipeline: there is no durable chunk table, pgvector, reranker, index version migration, or distributed refresh. A production-oriented follow-up would place those concerns behind the same `VectorStoreRetriever` boundary.

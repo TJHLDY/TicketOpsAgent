@@ -4,6 +4,9 @@ public record SopReference(
         String id,
         String title,
         String source,
-        double similarity
+        double similarity,
+        String chunkId,
+        int chunkIndex,
+        int totalChunks
 ) {
 }
