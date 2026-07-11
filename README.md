@@ -9,7 +9,7 @@ The current MVP verifies a controllable backend agent chain:
 1. Create an `OPEN` ticket from requester/title/description.
 2. Classify account and permission-related ticket text.
 3. Embed the retrieval query and retrieve an SOP/FAQ source citation from a Spring AI vector store.
-4. Call read-only mock tools backed by database tables.
+4. Validate a proposed tool intent through an allowlist, exact DTO schema, requester binding, category policy, and call budget before calling a read-only mock tool.
 5. Generate an internal suggestion, user reply draft, pending action, and trace events.
 6. Persist ticket, trace, tool call, and pending action evidence.
 7. Verify the routing boundary with deterministic Eval cases and mock LLM shadow Eval cases.
@@ -21,10 +21,11 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 2.0.0 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 91 automated tests passing at the latest verification.
+- 107 automated tests passing at the latest verification.
 - Spring AI `VectorStoreRetriever` retrieval with source citations and low-similarity refusal.
 - Offline feature-hash embedding for deterministic, key-free tests and demos.
 - Optional local ONNX Transformers profile for neural embeddings without a cloud API key.
+- Backend-owned `ReadOnlyToolExecutor` with exact schemas, requester identity binding, category policy, app-code normalization, and one-call budget.
 - `AgentDecisionPort` boundary in place with deterministic routing plus DeepSeek shadow evaluation.
 - DeepSeek shadow mode calls the model, parses a candidate `AgentDecision`, validates enums/tools/pending actions/confidence, and falls back to deterministic output on validation/API errors.
 - Mock LLM shadow Eval runner covers 34 accepted, unsafe, invalid model-output, tool-argument, and pending-action mismatch cases without requiring a real API key.
@@ -84,6 +85,7 @@ Expected chain:
 - SOP retrieval uses Spring AI `SimpleVectorStore` behind a read-only `VectorStoreRetriever`; `SimpleVectorStore` is a prototype/demo implementation, not production pgvector.
 - The default offline feature-hash embedding is deterministic test/demo infrastructure, not a trained semantic model. The optional `onnx` profile uses local ONNX Transformers.
 - Low-confidence retrieval stops before tool calls and pending actions and records `RAG_REJECT`.
+- Tool intents are untrusted proposals. Rejected tool validation records `TOOL_REJECT` and creates zero successful tool calls and zero pending actions.
 
 ## Quick Start
 
@@ -143,6 +145,26 @@ The first ONNX run may download and cache model resources. It requires no embedd
 
 When the best score is below `ticketops.rag.similarity-threshold`, the Agent returns a human-transfer draft, writes `RAG_REJECT`, and creates no tool call or pending action. See [docs/rag/vector-rag.md](docs/rag/vector-rag.md) for design, commands, evidence, and the explicit not production boundary.
 
+## Controlled Read-Only Tool Execution
+
+Both user-facing read-only calls run through `ReadOnlyToolExecutor`; category handlers no longer invoke concrete mock tools directly. The executor owns the allowlist, exact argument sets, typed DTO conversion, requester identity binding, application-code normalization, category-to-tool policy, and invocation.
+
+The default call budget is explicit:
+
+The property `ticketops.tools.max-calls-per-request` is fixed at `1` for the current single-tool MVP. Startup rejects any other value instead of pretending to support a multi-tool loop.
+
+```yaml
+ticketops:
+  tools:
+    max-calls-per-request: 1
+```
+
+Successful requests record `TOOL_DECISION` followed by a validated `TOOL_CALL`. Unknown tools, requester mismatch, missing or extra arguments, unsupported applications, category mismatch, and budget overflow record `TOOL_REJECT`. Rejection returns a human-review response with zero successful tool calls and zero pending actions.
+
+The tools remain mock-only database reads. No write tool is registered, and pending actions remain audit-only. See [docs/tools/controlled-tool-execution.md](docs/tools/controlled-tool-execution.md) for schemas, rejection reasons, verification, and boundaries.
+
+Tool results also constrain later actions: an account-lock ticket creates `UNLOCK_ACCOUNT` only when `getAccountStatus` returns `LOCKED`. An `ACTIVE`, `MFA_REQUIRED`, or `UNKNOWN` result keeps the read evidence but creates no unlock pending action.
+
 ## Scenario Acceptance
 
 The core backend ticket flows are covered by `ScenarioAcceptanceTest`:
@@ -183,7 +205,7 @@ See [docs/scenarios/scenario-report-guide.md](docs/scenarios/scenario-report-gui
 Deterministic Decision Service  ---> user-facing response
       |
       +--> Query Rewrite / Embedding / VectorStoreRetriever
-      +--> Read-only Tools
+      +--> ReadOnlyToolExecutor / Read-only Tools
       +--> Pending Action Proposal
       +--> Trace / Tool Log / Pending Action
       |
@@ -203,7 +225,7 @@ The deterministic path remains the user-facing main flow. The DeepSeek path is a
 
 Latest local validation:
 
-- `mvn test`: 91 tests PASS
+- `mvn test`: 107 tests PASS
 - `scripts\accept.ps1`: PASS
 - Secret scan: PASS
 - Shadow eval: 34 cases
@@ -216,6 +238,7 @@ Latest local validation:
 - Vector retrieval contracts: bilingual retrieval, database refresh, source citation, and low-similarity refusal PASS
 - Local ONNX smoke: Chinese account-lock query retrieved `SOP-ACCOUNT-LOCKED` from `mock-sop/account-locked.md` with provider `onnx` and score `0.568`
 - ONNX refusal smoke at threshold `0.95`: `RAG_REJECT`, 0 tool calls, and 0 pending actions
+- Controlled tool execution: allowlist, exact schemas, requester binding, category policy, normalization, one-call budget, and fail-closed rejection PASS
 
 These numbers are local validation evidence, not a production SLA.
 
@@ -271,6 +294,7 @@ This repository is not a production AI Agent or production ITSM system. It does 
 - [x] Scenario acceptance suite
 - [x] Scenario demo script and report summary
 - [x] Spring AI vector RAG with source citations and low-similarity refusal
+- [x] Controlled read-only tool execution with validation, budget, and rejection traces
 
 ## Documentation
 
@@ -280,6 +304,7 @@ This repository is not a production AI Agent or production ITSM system. It does 
 - [Scenario acceptance playbook](docs/scenarios/scenario-playbook.md): accepted business scenarios, expected evidence, and non-goals.
 - [Scenario report guide](docs/scenarios/scenario-report-guide.md): local script, generated report shape, and acceptance review method.
 - [Vector RAG guide](docs/rag/vector-rag.md): embedding providers, read-only retrieval, refusal behavior, and prototype boundary.
+- [Controlled tool execution guide](docs/tools/controlled-tool-execution.md): allowlist, typed schemas, requester binding, budget, traces, and fail-closed behavior.
 - [Interview notes](docs/interview/ticketops-interview-notes.md): resume-safe wording, STAR story, trade-offs, and likely interviewer questions.
 
 ## License
@@ -308,8 +333,8 @@ The mock shadow Eval writes `target/agent-eval/llm-shadow-eval.json`. The latest
 
 - `totalCases`: 34
 - `parseSuccessCount`: 31
-- `validationSuccessCount`: 12
-- `fallbackCount`: 22
+- `validationSuccessCount`: 11
+- `fallbackCount`: 23
 - `safetyPassCount`: 9 of 9
 - `traceAuditPassCount`: 34 of 34
 - `userVisibleChangedCount`: 0
@@ -445,11 +470,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\demo-scenarios.p
 
 The backend API and local demo contracts are stable enough to begin closing the remaining AI implementation gaps in separate, verifiable stages:
 
-1. Add controlled Spring AI 2 tool calling for the two read-only tools with explicit schemas, allowlists, argument validation, call budgets, and deterministic fallback.
-2. Add standard Spring AI/Micrometer observations without exporting prompt or tool content by default.
-3. Extend eval coverage for structured-output validity, tool selection, prompt injection, excessive agency, retrieval quality, and fallback behavior.
-4. Replace `SimpleVectorStore` with pgvector only in a later production-oriented persistence stage.
-5. Build the full frontend only after the backend AI contracts and runtime evidence are stable.
+1. Add standard Spring AI/Micrometer observations without exporting prompt, retrieval content, or tool arguments by default.
+2. Extend eval coverage for structured-output validity, tool selection, prompt injection, excessive agency, retrieval quality, and fallback behavior.
+3. Replace `SimpleVectorStore` with pgvector only in a later production-oriented persistence stage.
+4. Build the full frontend only after the backend AI contracts and runtime evidence are stable.
 
 These items are planned, not implemented. The current default remains deterministic, vector retrieval remains a prototype implementation, and no real enterprise write operation is executed.
 

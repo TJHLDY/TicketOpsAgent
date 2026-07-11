@@ -19,6 +19,8 @@ logging:
     org.springframework.ai.vectorstore.SimpleVectorStore: warn
 
 ticketops:
+  tools:
+    max-calls-per-request: 1
   rag:
     embedding-provider: offline
     similarity-threshold: 0.30

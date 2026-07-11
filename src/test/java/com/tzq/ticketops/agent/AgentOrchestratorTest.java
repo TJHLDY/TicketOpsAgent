@@ -1,10 +1,19 @@
 package com.tzq.ticketops.agent;
 
 import com.tzq.ticketops.agent.decision.AgentMode;
+import com.tzq.ticketops.agent.decision.AgentDecision;
+import com.tzq.ticketops.agent.decision.AgentDecisionPort;
+import com.tzq.ticketops.agent.decision.PendingActionProposal;
+import com.tzq.ticketops.agent.decision.ToolIntent;
 import com.tzq.ticketops.rag.SopSearchService;
 import com.tzq.ticketops.tools.MockAccountStatusTool;
 import com.tzq.ticketops.tools.MockUserPermissionsTool;
+import com.tzq.ticketops.tools.ReadOnlyToolExecutor;
+import com.tzq.ticketops.tools.UserPermissionsResult;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -38,6 +47,7 @@ class AgentOrchestratorTest {
                 .containsExactly(
                         "CLASSIFY",
                         "RAG_RETRIEVE",
+                        "TOOL_DECISION",
                         "TOOL_CALL",
                         "DRAFT_GENERATE",
                         "PENDING_ACTION"
@@ -70,6 +80,31 @@ class AgentOrchestratorTest {
     }
 
     @Test
+    void doesNotProposeUnlockWhenReadOnlyToolReportsAccountIsActive() {
+        AgentOrchestrator orchestrator = AgentOrchestrator.createDefault();
+
+        AgentResponse response = orchestrator.handle(new AgentRequest(
+                "mock-user-002",
+                "OA 账号锁定提示",
+                "页面提示账号可能已锁定，请帮我核实。"
+        ));
+
+        assertThat(response.category()).isEqualTo(TicketCategory.ACCOUNT_LOCKED);
+        assertThat(response.toolCalls()).singleElement()
+                .satisfies(call -> assertThat(call.resultSummary()).isEqualTo("ACTIVE"));
+        assertThat(response.pendingActions()).isEmpty();
+        assertThat(response.suggestion()).contains("ACTIVE", "未生成账号解锁动作");
+        assertThat(response.traceEvents()).extracting(TraceEvent::step)
+                .containsExactly(
+                        "CLASSIFY",
+                        "RAG_RETRIEVE",
+                        "TOOL_DECISION",
+                        "TOOL_CALL",
+                        "DRAFT_GENERATE"
+                );
+    }
+
+    @Test
     void handlesPermissionRequestWithReadOnlyPermissionToolAndPendingGrantAction() {
         AgentOrchestrator orchestrator = AgentOrchestrator.createDefault();
         AgentRequest request = new AgentRequest(
@@ -96,6 +131,7 @@ class AgentOrchestratorTest {
                 .containsExactly(
                         "CLASSIFY",
                         "RAG_RETRIEVE",
+                        "TOOL_DECISION",
                         "TOOL_CALL",
                         "DRAFT_GENERATE",
                         "PENDING_ACTION"
@@ -107,6 +143,34 @@ class AgentOrchestratorTest {
                         "threshold=0.3",
                         "provider=offline"
                 );
+    }
+
+    @Test
+    void doesNotTreatPermissionCodeNamedNoneAsAnEmptyPermissionResult() {
+        MockUserPermissionsTool permissionsTool = new MockUserPermissionsTool() {
+            @Override
+            public UserPermissionsResult getUserPermissions(String userId, String appCode) {
+                return new UserPermissionsResult(userId, appCode, List.of("NONE"));
+            }
+        };
+        AgentOrchestrator orchestrator = AgentOrchestrator.createWithDecisionMode(
+                AgentMode.DETERMINISTIC,
+                null,
+                SopSearchService.createOffline(0.30),
+                new MockAccountStatusTool(),
+                permissionsTool
+        );
+
+        AgentResponse response = orchestrator.handle(new AgentRequest(
+                "mock-user-005",
+                "CRM 权限申请",
+                "我访问 CRM 提示无权访问，请核对权限。"
+        ));
+
+        assertThat(response.toolCalls()).singleElement()
+                .satisfies(call -> assertThat(call.resultSummary()).isEqualTo("NONE"));
+        assertThat(response.pendingActions()).isEmpty();
+        assertThat(response.suggestion()).contains("已查询到", "权限：NONE");
     }
 
     @Test
@@ -134,6 +198,41 @@ class AgentOrchestratorTest {
                 .containsExactly("CLASSIFY", "RAG_REJECT");
         assertThat(response.traceEvents().get(1).detail())
                 .contains("reason=LOW_SIMILARITY", "threshold=1.0", "provider=offline");
+        assertThat(response.replyDraft()).contains("人工");
+    }
+
+    @Test
+    void rejectsUntrustedPrimaryToolIntentBeforeInvocationOrPendingAction() {
+        AgentDecisionPort maliciousDecision = context -> new AgentDecision(
+                TicketCategory.ACCOUNT_LOCKED,
+                TicketPriority.P2,
+                RiskLevel.NEEDS_APPROVAL,
+                "账号锁定处理",
+                List.of(new ToolIntent("getAccountStatus", Map.of("userId", "mock-user-002"))),
+                new PendingActionProposal(PendingActionType.UNLOCK_ACCOUNT, true),
+                "",
+                "",
+                1.0,
+                List.of("test")
+        );
+        AgentOrchestrator orchestrator = AgentOrchestrator.createWithPrimaryDecision(
+                maliciousDecision,
+                SopSearchService.createOffline(0.30),
+                new ReadOnlyToolExecutor(new MockAccountStatusTool(), new MockUserPermissionsTool(), 1)
+        );
+
+        AgentResponse response = orchestrator.handle(new AgentRequest(
+                "mock-user-001",
+                "OA 登录失败",
+                "我的账号已锁定。"
+        ));
+
+        assertThat(response.toolCalls()).isEmpty();
+        assertThat(response.pendingActions()).isEmpty();
+        assertThat(response.traceEvents()).extracting(TraceEvent::step)
+                .containsExactly("CLASSIFY", "RAG_RETRIEVE", "TOOL_DECISION", "TOOL_REJECT");
+        assertThat(response.traceEvents().get(3).detail())
+                .contains("reason=REQUESTER_MISMATCH", "tool=getAccountStatus", "budgetLimit=1");
         assertThat(response.replyDraft()).contains("人工");
     }
 }

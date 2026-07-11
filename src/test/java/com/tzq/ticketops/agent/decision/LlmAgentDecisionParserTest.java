@@ -113,6 +113,61 @@ class LlmAgentDecisionParserTest {
     }
 
     @Test
+    void rejectsExtraToolArguments() {
+        String json = """
+                {
+                  "category": "ACCOUNT_LOCKED",
+                  "priority": "P2",
+                  "riskLevel": "NEEDS_APPROVAL",
+                  "confidence": 0.9,
+                  "toolIntents": [
+                    {
+                      "toolName": "getAccountStatus",
+                      "arguments": {
+                        "userId": "mock-user-001",
+                        "force": "true"
+                      }
+                    }
+                  ],
+                  "pendingActions": [],
+                  "reasonCode": "EXTRA_ARGUMENT"
+                }
+                """;
+
+        assertThatThrownBy(() -> parser.parse(json))
+                .isInstanceOf(LlmDecisionException.class)
+                .hasMessageContaining("INVALID_TOOL_ARGUMENT");
+    }
+
+    @Test
+    void rejectsMoreThanOneToolIntent() {
+        String json = """
+                {
+                  "category": "ACCOUNT_LOCKED",
+                  "priority": "P2",
+                  "riskLevel": "NEEDS_APPROVAL",
+                  "confidence": 0.9,
+                  "toolIntents": [
+                    {
+                      "toolName": "getAccountStatus",
+                      "arguments": {"userId": "mock-user-001"}
+                    },
+                    {
+                      "toolName": "getAccountStatus",
+                      "arguments": {"userId": "mock-user-001"}
+                    }
+                  ],
+                  "pendingActions": [],
+                  "reasonCode": "TOO_MANY_TOOLS"
+                }
+                """;
+
+        assertThatThrownBy(() -> parser.parse(json))
+                .isInstanceOf(LlmDecisionException.class)
+                .hasMessageContaining("TOO_MANY_TOOL_INTENTS");
+    }
+
+    @Test
     void rejectsPendingActionThatDoesNotMatchCategory() {
         String json = """
                 {

@@ -52,7 +52,14 @@ class AgentControllerPersistenceTest {
         var log = logRepository.findByTicketId(ticket.id()).orElseThrow();
 
         assertThat(log.traceEvents()).extracting(TraceEvent::step)
-                .containsExactly("CLASSIFY", "RAG_RETRIEVE", "TOOL_CALL", "DRAFT_GENERATE", "PENDING_ACTION");
+                .containsExactly(
+                        "CLASSIFY",
+                        "RAG_RETRIEVE",
+                        "TOOL_DECISION",
+                        "TOOL_CALL",
+                        "DRAFT_GENERATE",
+                        "PENDING_ACTION"
+                );
         assertThat(log.toolCalls()).singleElement()
                 .satisfies(call -> assertThat(call.resultSummary()).isEqualTo("LOCKED"));
         assertThat(log.pendingActions()).singleElement()

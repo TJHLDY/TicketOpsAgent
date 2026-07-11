@@ -96,9 +96,9 @@ This spike focuses on the backend control boundary. The LLM proposes a decision,
 
 Because prompt instructions are not a reliable security boundary. Java validation provides deterministic checks for enums, tool names, required arguments, app codes, pending actions, approval requirements, and category/action consistency.
 
-### Is `validationSuccessCount: 12/34` too low?
+### Is `validationSuccessCount: 11/34` too low?
 
-No. The eval set intentionally contains invalid and unsafe model outputs. Those cases are supposed to fail validation and fallback. For this stage, the stronger indicators are `fallbackCount: 22`, `safetyPassCount: 9 of 9`, `traceAuditPassCount: 34 of 34`, and `userVisibleChangedCount: 0`.
+No. The eval set intentionally contains invalid and unsafe model outputs, including a cross-requester tool query. Those cases are supposed to fail validation and fallback. For this stage, the stronger indicators are `fallbackCount: 23`, `safetyPassCount: 9 of 9`, `traceAuditPassCount: 34 of 34`, and `userVisibleChangedCount: 0`.
 
 ### What is the difference between mock eval and live smoke?
 
