@@ -1,114 +1,117 @@
 package com.tzq.ticketops.rag;
 
 import com.tzq.ticketops.agent.SopReference;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.SimpleVectorStore;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.VectorStoreRetriever;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Locale;
+import java.util.Optional;
 
 @Component
 public class SopSearchService {
 
-    private final JdbcTemplate jdbcTemplate;
-
-    private final List<SopDocument> documents = List.of(
-            new SopDocument(
-                    "SOP-ACCOUNT-LOCKED",
-                    "账号锁定处理 SOP",
-                    "mock-sop/account-locked.md",
-                    "员工反馈 OA 或统一账号已锁定时，先查询账号状态，再生成解锁 pending action，等待人工确认。"
-            ),
-            new SopDocument(
-                    "FAQ-LOGIN-FAILED",
-                    "登录失败 FAQ",
-                    "mock-sop/login-failed.md",
-                    "登录失败需要先区分密码错误、账号锁定、MFA 异常和系统不可用。"
-            ),
-            new SopDocument(
-                    "SOP-MFA-ISSUE",
-                    "MFA 异常处理 SOP",
-                    "mock-sop/mfa-issue.md",
-                    "MFA 异常需要核验设备、时间同步和备用验证方式。"
-            ),
-            new SopDocument(
-                    "SOP-PERMISSION-REQUEST",
-                    "业务系统权限申请 SOP",
-                    "mock-sop/permission-request.md",
-                    "权限申请只生成审批建议，不自动授予真实权限。"
-            ),
-            new SopDocument(
-                    "FAQ-PRIVILEGE-RISK",
-                    "越权请求风险 FAQ",
-                    "mock-sop/privilege-risk.md",
-                    "管理员权限、绕过审批和批量授权请求应拒绝或转人工安全审核。"
-            )
-    );
+    private final VectorStoreRetriever retriever;
+    private final double similarityThreshold;
+    private final int topK;
+    private final String embeddingProvider;
 
     public SopSearchService() {
-        this.jdbcTemplate = null;
+        this(offlineRetriever(), 0.30, 1, "offline");
     }
 
     @Autowired
-    public SopSearchService(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public SopSearchService(
+            VectorStoreRetriever retriever,
+            @Value("${ticketops.rag.similarity-threshold:0.30}") double similarityThreshold,
+            @Value("${ticketops.rag.top-k:1}") int topK,
+            @Value("${ticketops.rag.embedding-provider:offline}") String embeddingProvider
+    ) {
+        if (similarityThreshold < 0 || similarityThreshold > 1) {
+            throw new IllegalArgumentException("similarityThreshold must be between 0 and 1");
+        }
+        if (topK < 1) {
+            throw new IllegalArgumentException("topK must be at least 1");
+        }
+        this.retriever = retriever;
+        this.similarityThreshold = similarityThreshold;
+        this.topK = topK;
+        this.embeddingProvider = embeddingProvider;
     }
 
-    public SopReference findBest(String text) {
-        List<SopDocument> availableDocuments = loadDocuments();
-        SopDocument document = availableDocuments.stream()
-                .filter(item -> matches(text, item))
-                .findFirst()
-                .orElse(availableDocuments.get(0));
-        return new SopReference(document.id(), document.title(), document.source(), 0.92);
+    public static SopSearchService createOffline(double similarityThreshold) {
+        return new SopSearchService(offlineRetriever(), similarityThreshold, 1, "offline");
     }
 
-    private boolean matches(String text, SopDocument document) {
-        String lowerText = text.toLowerCase(Locale.ROOT);
-        if ((text.contains("锁定") || lowerText.contains("locked"))
-                && document.id().equals("SOP-ACCOUNT-LOCKED")) {
-            return true;
+    public SopSearchResult search(String text) {
+        if (text == null || text.isBlank()) {
+            return new SopSearchResult(
+                    SopSearchStatus.LOW_SIMILARITY,
+                    Optional.empty(),
+                    0,
+                    similarityThreshold,
+                    embeddingProvider
+            );
         }
-        if (containsAny(text, "MFA", "验证码", "多因素")
-                || containsAny(lowerText, "mfa", "multi-factor", "multi factor", "verification code", "authenticator")) {
-            return document.id().equals("SOP-MFA-ISSUE");
+        SearchRequest request = SearchRequest.builder()
+                .query(text)
+                .topK(topK)
+                .similarityThresholdAll()
+                .build();
+        List<Document> documents = retriever.similaritySearch(request);
+        if (documents.isEmpty()) {
+            return new SopSearchResult(
+                    SopSearchStatus.NO_DOCUMENTS,
+                    Optional.empty(),
+                    0,
+                    similarityThreshold,
+                    embeddingProvider
+            );
         }
-        return (containsAny(text, "权限", "无权访问")
-                || containsAny(lowerText, "permission", "access denied", "no access", "not authorized",
-                "request access", "cannot access", "can't access"))
-                && document.id().equals("SOP-PERMISSION-REQUEST");
-    }
 
-    private boolean containsAny(String text, String... keywords) {
-        for (String keyword : keywords) {
-            if (text.contains(keyword)) {
-                return true;
-            }
+        Document best = documents.get(0);
+        double score = best.getScore() == null ? 0 : best.getScore();
+        if (score < similarityThreshold) {
+            return new SopSearchResult(
+                    SopSearchStatus.LOW_SIMILARITY,
+                    Optional.empty(),
+                    score,
+                    similarityThreshold,
+                    embeddingProvider
+            );
         }
-        return false;
-    }
 
-    private List<SopDocument> loadDocuments() {
-        if (jdbcTemplate == null) {
-            return documents;
-        }
-        List<SopDocument> rows = jdbcTemplate.query(
-                """
-                        select id, title, source, content
-                        from sop_document
-                        order by id
-                        """,
-                (rs, rowNum) -> new SopDocument(
-                        rs.getString("id"),
-                        rs.getString("title"),
-                        rs.getString("source"),
-                        rs.getString("content")
-                )
+        SopReference reference = new SopReference(
+                best.getId(),
+                metadata(best, RefreshingSopVectorStoreRetriever.TITLE_METADATA),
+                metadata(best, RefreshingSopVectorStoreRetriever.SOURCE_METADATA),
+                score
         );
-        if (rows.isEmpty()) {
-            return documents;
+        return new SopSearchResult(
+                SopSearchStatus.ACCEPTED,
+                Optional.of(reference),
+                score,
+                similarityThreshold,
+                embeddingProvider
+        );
+    }
+
+    private String metadata(Document document, String key) {
+        Object value = document.getMetadata().get(key);
+        if (value == null) {
+            throw new IllegalStateException("Retrieved SOP document is missing metadata: " + key);
         }
-        return rows;
+        return value.toString();
+    }
+
+    private static VectorStoreRetriever offlineRetriever() {
+        OfflineFeatureHashEmbeddingModel embeddingModel = new OfflineFeatureHashEmbeddingModel();
+        VectorStore vectorStore = SimpleVectorStore.builder(embeddingModel).build();
+        return new RefreshingSopVectorStoreRetriever(vectorStore, DefaultSopDocuments::all);
     }
 }

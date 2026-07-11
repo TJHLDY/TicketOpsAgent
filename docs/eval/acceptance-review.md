@@ -86,4 +86,4 @@ The review should decide whether the current mock shadow eval plus optional live
 - No LDAP, SSO, OA, IAM, or approval workflow integration.
 - No automatic unlock, password reset, permission grant, dispatch, or ticket close.
 - No LLM-driven user-facing response.
-- SOP retrieval is still keyword/table driven, not vector RAG.
+- SOP retrieval now uses embedding-based Spring AI `SimpleVectorStore` with source citations and low-similarity refusal; it is still not production pgvector.

@@ -1,6 +1,6 @@
 package com.tzq.ticketops.rag;
 
-record SopDocument(
+public record SopDocument(
         String id,
         String title,
         String source,

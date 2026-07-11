@@ -8,6 +8,8 @@ import com.tzq.ticketops.agent.decision.DeepSeekLlmAgentDecisionService;
 import com.tzq.ticketops.agent.decision.DeterministicAgentDecisionService;
 import com.tzq.ticketops.agent.decision.LlmDecisionException;
 import com.tzq.ticketops.rag.SopSearchService;
+import com.tzq.ticketops.rag.SopSearchResult;
+import com.tzq.ticketops.rag.SopSearchStatus;
 import com.tzq.ticketops.tools.AccountStatusResult;
 import com.tzq.ticketops.tools.MockAccountStatusTool;
 import com.tzq.ticketops.tools.MockUserPermissionsTool;
@@ -97,7 +99,7 @@ public class AgentOrchestrator {
                 AgentMode.DETERMINISTIC,
                 new DeterministicAgentDecisionService(),
                 null,
-                new SopSearchService(),
+                SopSearchService.createOffline(0.30),
                 new MockAccountStatusTool(),
                 new MockUserPermissionsTool(),
                 DEFAULT_LLM_PROVIDER,
@@ -146,10 +148,10 @@ public class AgentOrchestrator {
         }
 
         if (category == TicketCategory.ACCOUNT_LOCKED) {
-            return handleAccountLocked(request, traceEvents, category, priority, riskLevel);
+            return handleAccountLocked(request, decision.sopQuery(), traceEvents, category, priority, riskLevel);
         }
         if (category == TicketCategory.PERMISSION_REQUEST) {
-            return handlePermissionRequest(request, traceEvents, category, priority, riskLevel);
+            return handlePermissionRequest(request, decision.sopQuery(), traceEvents, category, priority, riskLevel);
         }
 
         return new AgentResponse(
@@ -167,17 +169,19 @@ public class AgentOrchestrator {
 
     private AgentResponse handlePermissionRequest(
             AgentRequest request,
+            String sopQuery,
             List<TraceEvent> traceEvents,
             TicketCategory category,
             TicketPriority priority,
             RiskLevel riskLevel
     ) {
         String text = request.title() + "\n" + request.description();
-        SopReference sop = sopSearchService.findBest(text);
-        traceEvents.add(new TraceEvent(
-                "RAG_RETRIEVE",
-                "docId=" + sop.id() + ", doc=" + sop.title() + ", similarity=" + sop.similarity()
-        ));
+        SopSearchResult searchResult = sopSearchService.search(ragQuery(sopQuery, text));
+        if (searchResult.status() != SopSearchStatus.ACCEPTED) {
+            return ragRejectedResponse(category, priority, riskLevel, traceEvents, searchResult);
+        }
+        SopReference sop = searchResult.reference().orElseThrow();
+        traceEvents.add(acceptedRagTrace(sop, searchResult));
 
         String appCode = extractAppCode(text);
         UserPermissionsResult permissions = permissionsTool.getUserPermissions(request.requesterId(), appCode);
@@ -242,18 +246,50 @@ public class AgentOrchestrator {
         );
     }
 
+    private AgentResponse ragRejectedResponse(
+            TicketCategory category,
+            TicketPriority priority,
+            RiskLevel riskLevel,
+            List<TraceEvent> traceEvents,
+            SopSearchResult searchResult
+    ) {
+        traceEvents.add(new TraceEvent(
+                "RAG_REJECT",
+                "reason=" + searchResult.status()
+                        + ", bestSimilarity=" + searchResult.bestScore()
+                        + ", threshold=" + searchResult.threshold()
+                        + ", provider=" + searchResult.embeddingProvider()
+        ));
+        return new AgentResponse(
+                category,
+                priority,
+                riskLevel,
+                List.of(),
+                List.of(),
+                "SOP 检索相似度低于可信阈值，未调用工具或生成待执行动作，建议转人工支持。",
+                "您好，当前资料与您的问题匹配度不足，已停止自动处理并建议由 IT 支持人员人工核实。",
+                List.of(),
+                List.copyOf(traceEvents)
+        );
+    }
+
     private AgentResponse handleAccountLocked(
             AgentRequest request,
+            String sopQuery,
             List<TraceEvent> traceEvents,
             TicketCategory category,
             TicketPriority priority,
             RiskLevel riskLevel
     ) {
-        SopReference sop = sopSearchService.findBest(request.title() + "\n" + request.description());
-        traceEvents.add(new TraceEvent(
-                "RAG_RETRIEVE",
-                "docId=" + sop.id() + ", doc=" + sop.title() + ", similarity=" + sop.similarity()
+        SopSearchResult searchResult = sopSearchService.search(ragQuery(
+                sopQuery,
+                request.title() + "\n" + request.description()
         ));
+        if (searchResult.status() != SopSearchStatus.ACCEPTED) {
+            return ragRejectedResponse(category, priority, riskLevel, traceEvents, searchResult);
+        }
+        SopReference sop = searchResult.reference().orElseThrow();
+        traceEvents.add(acceptedRagTrace(sop, searchResult));
 
         AccountStatusResult accountStatus = accountStatusTool.getAccountStatus(request.requesterId());
         ToolCallRecord toolCall = new ToolCallRecord(
@@ -284,6 +320,26 @@ public class AgentOrchestrator {
                 List.of(pendingAction),
                 List.copyOf(traceEvents)
         );
+    }
+
+    private TraceEvent acceptedRagTrace(SopReference sop, SopSearchResult searchResult) {
+        return new TraceEvent(
+                "RAG_RETRIEVE",
+                "status=ACCEPTED"
+                        + ", docId=" + sop.id()
+                        + ", doc=" + sop.title()
+                        + ", source=" + sop.source()
+                        + ", similarity=" + sop.similarity()
+                        + ", threshold=" + searchResult.threshold()
+                        + ", provider=" + searchResult.embeddingProvider()
+        );
+    }
+
+    private String ragQuery(String sopQuery, String userText) {
+        if (sopQuery == null || sopQuery.isBlank()) {
+            return userText;
+        }
+        return sopQuery + "\n" + userText;
     }
 
     private String extractAppCode(String text) {
