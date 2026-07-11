@@ -110,6 +110,32 @@ class BackendApiProductizationTest {
     }
 
     @Test
+    void messageApiReturnsPersistedSuggestionAndReplyDraft() throws Exception {
+        String ticketId = createAccountLockedTicket();
+
+        mockMvc.perform(get("/api/tickets/{ticketId}/messages", ticketId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].ticketId").value(ticketId))
+                .andExpect(jsonPath("$[0].messageOrder").value(0))
+                .andExpect(jsonPath("$[0].senderType").value("INTERNAL_SUGGESTION"))
+                .andExpect(jsonPath("$[0].content").value(org.hamcrest.Matchers.containsString("账号解锁申请")))
+                .andExpect(jsonPath("$[0].createdAt").exists())
+                .andExpect(jsonPath("$[1].messageOrder").value(1))
+                .andExpect(jsonPath("$[1].senderType").value("USER_REPLY_DRAFT"))
+                .andExpect(jsonPath("$[1].content").value(org.hamcrest.Matchers.containsString("账号已锁定")));
+
+        mockMvc.perform(get("/api/tickets/{ticketId}/messages", "missing-ticket"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("TICKET_NOT_FOUND"));
+
+        mockMvc.perform(post("/api/tickets/{ticketId}/messages", ticketId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isMethodNotAllowed());
+    }
+
+    @Test
     void approvePendingActionDoesNotExecuteRealOperation() throws Exception {
         String ticketId = createAccountLockedTicket();
         long actionId = firstPendingActionId(ticketId);

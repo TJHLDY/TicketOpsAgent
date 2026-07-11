@@ -5,6 +5,7 @@ import com.tzq.ticketops.agent.PendingActionRecord;
 import com.tzq.ticketops.agent.RiskLevel;
 import com.tzq.ticketops.agent.TicketCategory;
 import com.tzq.ticketops.agent.TicketPriority;
+import com.tzq.ticketops.agent.TicketMessageRecord;
 import com.tzq.ticketops.agent.ToolCallLogRecord;
 import com.tzq.ticketops.agent.TraceEventRecord;
 import com.tzq.ticketops.ticket.Ticket;
@@ -79,6 +80,15 @@ public class TicketQueryController {
         return logRepository.findPendingActionsByTicketId(ticketId)
                 .stream()
                 .map(PendingActionDto::from)
+                .toList();
+    }
+
+    @GetMapping("/{ticketId}/messages")
+    public List<TicketMessageDto> messages(@PathVariable String ticketId) {
+        ensureTicketExists(ticketId);
+        return logRepository.findMessagesByTicketId(ticketId)
+                .stream()
+                .map(TicketMessageDto::from)
                 .toList();
     }
 
@@ -186,6 +196,26 @@ public class TicketQueryController {
                     record.reviewComment(),
                     record.reviewedAt(),
                     record.executionStatus(),
+                    record.createdAt()
+            );
+        }
+    }
+
+    public record TicketMessageDto(
+            long id,
+            String ticketId,
+            int messageOrder,
+            String senderType,
+            String content,
+            Instant createdAt
+    ) {
+        static TicketMessageDto from(TicketMessageRecord record) {
+            return new TicketMessageDto(
+                    record.id(),
+                    record.ticketId(),
+                    record.messageOrder(),
+                    record.senderType().name(),
+                    record.content(),
                     record.createdAt()
             );
         }

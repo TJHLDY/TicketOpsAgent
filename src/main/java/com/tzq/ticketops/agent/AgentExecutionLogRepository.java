@@ -21,6 +21,10 @@ public interface AgentExecutionLogRepository {
         return List.of();
     }
 
+    default List<TicketMessageRecord> findMessagesByTicketId(String ticketId) {
+        return List.of();
+    }
+
     default Optional<PendingActionRecord> findPendingActionById(long actionId) {
         return Optional.empty();
     }

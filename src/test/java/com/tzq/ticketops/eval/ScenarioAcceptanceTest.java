@@ -87,6 +87,7 @@ class ScenarioAcceptanceTest {
         assertTraceContains(ticketId, "RAG_RETRIEVE", "docId=SOP-ACCOUNT-LOCKED");
         assertToolCall(ticketId, "getAccountStatus", "LOCKED");
         assertPendingAction(ticketId, "UNLOCK_ACCOUNT", "PENDING", EXECUTION_STATUS);
+        assertMessages(ticketId, "账号解锁申请", "账号已锁定");
     }
 
     @Test
@@ -131,6 +132,7 @@ class ScenarioAcceptanceTest {
         assertTraceContains(ticketId, "CLASSIFY", "risk=REJECT");
         assertNoToolCalls(ticketId);
         assertNoPendingActions(ticketId);
+        assertMessages(ticketId, "安全审核", "人工审核");
     }
 
     @Test
@@ -207,6 +209,19 @@ class ScenarioAcceptanceTest {
     private void assertNoPendingActions(String ticketId) throws Exception {
         JsonNode actions = getJson("/api/tickets/" + ticketId + "/pending-actions");
         assertThat(actions).isEmpty();
+    }
+
+    private void assertMessages(
+            String ticketId,
+            String suggestionPart,
+            String replyDraftPart
+    ) throws Exception {
+        JsonNode messages = getJson("/api/tickets/" + ticketId + "/messages");
+        assertThat(messages).hasSize(2);
+        assertThat(messages.get(0).get("senderType").asText()).isEqualTo("INTERNAL_SUGGESTION");
+        assertThat(messages.get(0).get("content").asText()).contains(suggestionPart);
+        assertThat(messages.get(1).get("senderType").asText()).isEqualTo("USER_REPLY_DRAFT");
+        assertThat(messages.get(1).get("content").asText()).contains(replyDraftPart);
     }
 
     private JsonNode getJson(String path) throws Exception {

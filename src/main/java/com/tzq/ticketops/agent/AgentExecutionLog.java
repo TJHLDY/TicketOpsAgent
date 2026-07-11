@@ -6,6 +6,8 @@ public record AgentExecutionLog(
         String ticketId,
         List<TraceEvent> traceEvents,
         List<ToolCallRecord> toolCalls,
-        List<PendingAction> pendingActions
+        List<PendingAction> pendingActions,
+        String suggestion,
+        String replyDraft
 ) {
 }

@@ -11,7 +11,7 @@ The current MVP verifies a controllable backend agent chain:
 3. Embed the retrieval query and retrieve an SOP/FAQ source citation from a Spring AI vector store.
 4. Validate a proposed tool intent through an allowlist, exact DTO schema, requester binding, category policy, and call budget before calling a read-only mock tool.
 5. Generate an internal suggestion, user reply draft, pending action, and trace events.
-6. Persist ticket, trace, tool call, and pending action evidence.
+6. Persist ticket, trace, tool call, pending action, internal suggestion, and reply draft evidence.
 7. Verify the routing boundary with deterministic Eval cases and mock LLM shadow Eval cases.
 
 ## Current Status
@@ -21,7 +21,7 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 2.0.0 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 119 automated tests passing at the latest verification.
+- 126 automated tests passing at the latest verification.
 - Spring AI `VectorStoreRetriever` retrieval with source citations and low-similarity refusal.
 - Offline feature-hash embedding for deterministic, key-free tests and demos.
 - Optional local ONNX Transformers profile for neural embeddings without a cloud API key.
@@ -32,6 +32,7 @@ The current MVP verifies a controllable backend agent chain:
 - `scripts\accept.ps1` can optionally run a real DeepSeek shadow smoke check and record provider/model/prompt/schema/latency/fallback evidence.
 - DeepSeek shadow evaluation is phase-closed for this spike: evaluable, rollback-safe, and reproducible enough for review and resume/interview material.
 - Backend API productization is implemented: ticket detail/list, trace/tool call reads, pending action review, and eval report reads.
+- Agent-generated internal suggestions and user reply drafts are persisted for read-only audit.
 - Backend API error contract hardening is implemented: stable JSON error codes for missing resources, invalid requests, and already reviewed pending actions.
 - Privacy-safe Micrometer metrics and local Actuator health/metrics diagnostics are implemented with bounded tags.
 - No real enterprise system integration.
@@ -181,6 +182,18 @@ Invoke-RestMethod http://127.0.0.1:8081/actuator/metrics/ticketops.tool.executio
 
 Only `health`, `info`, and `metrics` are exposed on the separate management server. It defaults to `127.0.0.1:8081`, so the business port does not serve `/actuator/*` and remote hosts cannot connect to the management listener. `/actuator/env` is not exposed. No Prometheus, Grafana, or external tracing backend is added in this MVP; the Actuator metrics endpoint is for local diagnostics. See [docs/observability/privacy-safe-observability.md](docs/observability/privacy-safe-observability.md) for the metric contract and privacy boundary.
 
+## Persisted Agent Drafts
+
+Every completed Agent request stores two ordered `ticket_message` records: `INTERNAL_SUGGESTION` for the operator-facing handling suggestion and `USER_REPLY_DRAFT` for the user-facing reply draft. They are committed in the same transaction as trace, tool call, and pending action evidence.
+
+Inspect them through the read-only endpoint:
+
+```text
+GET /api/tickets/{ticketId}/messages
+```
+
+No message is automatically sent. There is no message send, edit, delivery, or outbound integration endpoint in this MVP. See [docs/api/agent-draft-persistence.md](docs/api/agent-draft-persistence.md) for the storage contract and draft-only boundary.
+
 ## Scenario Acceptance
 
 The core backend ticket flows are covered by `ScenarioAcceptanceTest`:
@@ -241,7 +254,7 @@ The deterministic path remains the user-facing main flow. The DeepSeek path is a
 
 Latest local validation:
 
-- `mvn test`: 119 tests PASS
+- `mvn test`: 126 tests PASS
 - `scripts\accept.ps1`: PASS
 - Secret scan: PASS
 - Shadow eval: 34 cases
@@ -311,6 +324,7 @@ This repository is not a production AI Agent or production ITSM system. It does 
 - [x] Scenario demo script and report summary
 - [x] Spring AI vector RAG with source citations and low-similarity refusal
 - [x] Controlled read-only tool execution with validation, budget, and rejection traces
+- [x] Persist internal suggestions and user reply drafts as read-only audit evidence
 - [x] Privacy-safe Micrometer metrics and local Actuator diagnostics
 
 ## Documentation
@@ -323,6 +337,7 @@ This repository is not a production AI Agent or production ITSM system. It does 
 - [Vector RAG guide](docs/rag/vector-rag.md): embedding providers, read-only retrieval, refusal behavior, and prototype boundary.
 - [Controlled tool execution guide](docs/tools/controlled-tool-execution.md): allowlist, typed schemas, requester binding, budget, traces, and fail-closed behavior.
 - [Privacy-safe observability guide](docs/observability/privacy-safe-observability.md): bounded metrics, local Actuator inspection, sensitive-content defaults, and non-goals.
+- [Agent draft persistence guide](docs/api/agent-draft-persistence.md): atomic storage, read API, and draft-only boundary.
 - [Interview notes](docs/interview/ticketops-interview-notes.md): resume-safe wording, STAR story, trade-offs, and likely interviewer questions.
 
 ## License

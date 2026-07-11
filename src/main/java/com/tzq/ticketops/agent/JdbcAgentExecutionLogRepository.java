@@ -4,6 +4,7 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -24,11 +25,13 @@ public class JdbcAgentExecutionLogRepository implements AgentExecutionLogReposit
     }
 
     @Override
+    @Transactional
     public void save(AgentExecutionLog log) {
         deleteExisting(log.ticketId());
         saveTraceEvents(log.ticketId(), log.traceEvents());
         saveToolCalls(log.ticketId(), log.toolCalls());
         savePendingActions(log.ticketId(), log.pendingActions());
+        saveMessages(log.ticketId(), log.suggestion(), log.replyDraft());
     }
 
     @Override
@@ -70,11 +73,19 @@ public class JdbcAgentExecutionLogRepository implements AgentExecutionLogReposit
                 ),
                 ticketId
         );
+        List<TicketMessageRecord> messages = findMessagesByTicketId(ticketId);
 
-        if (traceEvents.isEmpty() && toolCalls.isEmpty() && pendingActions.isEmpty()) {
+        if (traceEvents.isEmpty() && toolCalls.isEmpty() && pendingActions.isEmpty() && messages.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(new AgentExecutionLog(ticketId, traceEvents, toolCalls, pendingActions));
+        return Optional.of(new AgentExecutionLog(
+                ticketId,
+                traceEvents,
+                toolCalls,
+                pendingActions,
+                messageContent(messages, TicketMessageSenderType.INTERNAL_SUGGESTION),
+                messageContent(messages, TicketMessageSenderType.USER_REPLY_DRAFT)
+        ));
     }
 
     @Override
@@ -136,6 +147,30 @@ public class JdbcAgentExecutionLogRepository implements AgentExecutionLogReposit
     }
 
     @Override
+    public List<TicketMessageRecord> findMessagesByTicketId(String ticketId) {
+        return jdbcTemplate.query(
+                """
+                        select id, ticket_id, message_order, sender_type, content, created_at
+                        from ticket_message
+                        where ticket_id = ?
+                          and sender_type in (?, ?)
+                        order by message_order, id
+                        """,
+                (rs, rowNum) -> new TicketMessageRecord(
+                        rs.getLong("id"),
+                        rs.getString("ticket_id"),
+                        rs.getInt("message_order"),
+                        TicketMessageSenderType.valueOf(rs.getString("sender_type")),
+                        rs.getString("content"),
+                        rs.getTimestamp("created_at").toInstant()
+                ),
+                ticketId,
+                TicketMessageSenderType.INTERNAL_SUGGESTION.name(),
+                TicketMessageSenderType.USER_REPLY_DRAFT.name()
+        );
+    }
+
+    @Override
     public Optional<PendingActionRecord> findPendingActionById(long actionId) {
         return jdbcTemplate.query(
                 """
@@ -170,6 +205,12 @@ public class JdbcAgentExecutionLogRepository implements AgentExecutionLogReposit
     }
 
     private void deleteExisting(String ticketId) {
+        jdbcTemplate.update(
+                "delete from ticket_message where ticket_id = ? and sender_type in (?, ?)",
+                ticketId,
+                TicketMessageSenderType.INTERNAL_SUGGESTION.name(),
+                TicketMessageSenderType.USER_REPLY_DRAFT.name()
+        );
         jdbcTemplate.update("delete from agent_trace where ticket_id = ?", ticketId);
         jdbcTemplate.update("delete from tool_call_log where ticket_id = ?", ticketId);
         jdbcTemplate.update("delete from pending_action where ticket_id = ?", ticketId);
@@ -213,6 +254,37 @@ public class JdbcAgentExecutionLogRepository implements AgentExecutionLogReposit
                     action.summary()
             );
         }
+    }
+
+    private void saveMessages(String ticketId, String suggestion, String replyDraft) {
+        saveMessage(ticketId, 0, TicketMessageSenderType.INTERNAL_SUGGESTION, suggestion);
+        saveMessage(ticketId, 1, TicketMessageSenderType.USER_REPLY_DRAFT, replyDraft);
+    }
+
+    private void saveMessage(
+            String ticketId,
+            int messageOrder,
+            TicketMessageSenderType senderType,
+            String content
+    ) {
+        jdbcTemplate.update(
+                "insert into ticket_message(ticket_id, message_order, sender_type, content) values (?, ?, ?, ?)",
+                ticketId,
+                messageOrder,
+                senderType.name(),
+                content
+        );
+    }
+
+    private String messageContent(
+            List<TicketMessageRecord> messages,
+            TicketMessageSenderType senderType
+    ) {
+        return messages.stream()
+                .filter(message -> message.senderType() == senderType)
+                .map(TicketMessageRecord::content)
+                .findFirst()
+                .orElse("");
     }
 
     private String writeArguments(Map<String, String> arguments) {
