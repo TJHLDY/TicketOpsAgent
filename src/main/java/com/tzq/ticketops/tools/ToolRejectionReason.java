@@ -1,0 +1,13 @@
+package com.tzq.ticketops.tools;
+
+public enum ToolRejectionReason {
+    MISSING_TOOL_INTENT,
+    TOOL_BUDGET_EXCEEDED,
+    UNAUTHORIZED_TOOL,
+    CATEGORY_TOOL_MISMATCH,
+    INVALID_ARGUMENTS,
+    REQUESTER_MISMATCH,
+    UNSUPPORTED_APP_CODE,
+    TOOL_INVOCATION_FAILED
+}
+

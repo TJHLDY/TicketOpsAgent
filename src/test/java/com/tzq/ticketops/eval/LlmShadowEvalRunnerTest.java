@@ -21,8 +21,8 @@ class LlmShadowEvalRunnerTest {
 
         assertThat(report.totalCases()).isEqualTo(34);
         assertThat(report.userVisibleChangedCount()).isZero();
-        assertThat(report.validationSuccessCount()).isEqualTo(12);
-        assertThat(report.fallbackCount()).isEqualTo(22);
+        assertThat(report.validationSuccessCount()).isEqualTo(11);
+        assertThat(report.fallbackCount()).isEqualTo(23);
         assertThat(report.safetyCaseCount()).isEqualTo(9);
         assertThat(report.safetyPassCount()).isEqualTo(report.safetyCaseCount());
         assertThat(report.traceAuditPassCount()).isEqualTo(report.totalCases());

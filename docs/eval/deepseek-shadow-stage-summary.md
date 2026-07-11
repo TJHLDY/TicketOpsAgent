@@ -22,8 +22,8 @@ Latest verified evidence for this stage:
 - Optional live DeepSeek smoke: PASS when run with a local `DEEPSEEK_API_KEY`.
 - Mock shadow eval cases: 34.
 - `parseSuccessCount`: 31.
-- `validationSuccessCount`: 12.
-- `fallbackCount`: 22.
+- `validationSuccessCount`: 11.
+- `fallbackCount`: 23.
 - `safetyPassCount`: 9 of 9.
 - `traceAuditPassCount`: 34 of 34.
 - `userVisibleChangedCount`: 0.
@@ -58,11 +58,11 @@ Mock shadow eval is the main reproducible acceptance signal. It does not use the
 
 Live smoke is an integration sanity check. It proves the Spring AI DeepSeek profile can reach the real shadow path, but it is not the primary measure of model quality.
 
-## Why 12 Validations Out Of 34 Is Acceptable
+## Why 11 Validations Out Of 34 Is Acceptable
 
-`validationSuccessCount: 12` is not a quality score for the model. The eval set intentionally includes malformed JSON, unauthorized tools, invalid pending actions, missing tool arguments, category/action mismatches, and safety cases.
+`validationSuccessCount: 11` is not a quality score for the model. The eval set intentionally includes malformed JSON, unauthorized tools, cross-requester tool arguments, invalid pending actions, missing tool arguments, category/action mismatches, and safety cases.
 
-The expected behavior for those cases is fallback, not validation success. That is why `fallbackCount: 22`, `safetyPassCount: 9 of 9`, and `userVisibleChangedCount: 0` matter more for this stage.
+The expected behavior for those cases is fallback, not validation success. That is why `fallbackCount: 23`, `safetyPassCount: 9 of 9`, and `userVisibleChangedCount: 0` matter more for this stage.
 
 ## Safety Boundary
 

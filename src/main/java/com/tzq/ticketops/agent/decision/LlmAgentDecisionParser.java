@@ -9,7 +9,9 @@ import com.tzq.ticketops.agent.TicketPriority;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -18,6 +20,8 @@ public class LlmAgentDecisionParser {
 
     private static final Set<String> ALLOWED_TOOLS = Set.of("getAccountStatus", "getUserPermissions");
     private static final Set<String> ALLOWED_APP_CODES = Set.of("OA", "CRM", "ERP", "VPN");
+    private static final Set<String> ACCOUNT_TOOL_ARGUMENTS = Set.of("userId");
+    private static final Set<String> PERMISSION_TOOL_ARGUMENTS = Set.of("userId", "appCode");
     private static final Set<PendingActionType> ALLOWED_PENDING_ACTIONS = Set.of(
             PendingActionType.UNLOCK_ACCOUNT,
             PendingActionType.GRANT_PERMISSION
@@ -84,27 +88,39 @@ public class LlmAgentDecisionParser {
         if (toolDtos == null || toolDtos.isEmpty()) {
             return List.of();
         }
+        if (toolDtos.size() > 1) {
+            throw new LlmDecisionException("TOO_MANY_TOOL_INTENTS", "only one tool intent is supported");
+        }
         List<ToolIntent> toolIntents = new ArrayList<>();
         for (LlmToolIntentDto toolDto : toolDtos) {
             if (toolDto == null || toolDto.toolName() == null || !ALLOWED_TOOLS.contains(toolDto.toolName())) {
                 throw new LlmDecisionException("UNAUTHORIZED_TOOL", toolDto == null ? "null" : String.valueOf(toolDto.toolName()));
             }
             Map<String, String> arguments = toolDto.arguments() == null ? Map.of() : toolDto.arguments();
-            validateRequiredToolArguments(toolDto.toolName(), arguments);
-            if (arguments.containsKey("appCode") && !ALLOWED_APP_CODES.contains(arguments.get("appCode"))) {
+            validateToolArguments(toolDto.toolName(), arguments);
+            Map<String, String> normalizedArguments = new LinkedHashMap<>(arguments);
+            if (normalizedArguments.containsKey("appCode")) {
+                normalizedArguments.put(
+                        "appCode",
+                        normalizedArguments.get("appCode").trim().toUpperCase(Locale.ROOT)
+                );
+            }
+            if (normalizedArguments.containsKey("appCode")
+                    && !ALLOWED_APP_CODES.contains(normalizedArguments.get("appCode"))) {
                 throw new LlmDecisionException("INVALID_TOOL_ARGUMENT", "unsupported appCode");
             }
-            toolIntents.add(new ToolIntent(toolDto.toolName(), arguments));
+            toolIntents.add(new ToolIntent(toolDto.toolName(), Map.copyOf(normalizedArguments)));
         }
         return List.copyOf(toolIntents);
     }
 
-    private void validateRequiredToolArguments(String toolName, Map<String, String> arguments) {
-        if (isBlank(arguments.get("userId"))) {
-            throw new LlmDecisionException("INVALID_TOOL_ARGUMENT", "missing userId");
-        }
-        if ("getUserPermissions".equals(toolName) && isBlank(arguments.get("appCode"))) {
-            throw new LlmDecisionException("INVALID_TOOL_ARGUMENT", "missing appCode");
+    private void validateToolArguments(String toolName, Map<String, String> arguments) {
+        Set<String> expectedArguments = "getUserPermissions".equals(toolName)
+                ? PERMISSION_TOOL_ARGUMENTS
+                : ACCOUNT_TOOL_ARGUMENTS;
+        if (!arguments.keySet().equals(expectedArguments)
+                || arguments.values().stream().anyMatch(this::isBlank)) {
+            throw new LlmDecisionException("INVALID_TOOL_ARGUMENT", "arguments do not match tool schema");
         }
     }
 

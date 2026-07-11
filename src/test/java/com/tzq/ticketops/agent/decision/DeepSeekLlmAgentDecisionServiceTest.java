@@ -100,6 +100,38 @@ class DeepSeekLlmAgentDecisionServiceTest {
                 .contains("Do not use actionType values such as unlock, resetPassword, closeTicket, or grantPermissionNow.");
     }
 
+    @Test
+    void rejectsToolIntentForDifferentRequester() {
+        DeepSeekLlmAgentDecisionService service = new DeepSeekLlmAgentDecisionService(
+                fixedProvider(prompt -> """
+                        {
+                          "category": "ACCOUNT_LOCKED",
+                          "priority": "P2",
+                          "riskLevel": "NEEDS_APPROVAL",
+                          "confidence": 0.91,
+                          "sopQuery": "account locked SOP",
+                          "toolIntents": [
+                            {
+                              "toolName": "getAccountStatus",
+                              "arguments": {"userId": "mock-user-002"}
+                            }
+                          ],
+                          "pendingActions": [],
+                          "reasonCode": "CROSS_USER_QUERY"
+                        }
+                        """),
+                new LlmAgentDecisionParser(new ObjectMapper())
+        );
+
+        assertThatThrownBy(() -> service.decide(new AgentContext(
+                "mock-user-001",
+                "OA account locked",
+                "My account is locked."
+        )))
+                .isInstanceOf(LlmDecisionException.class)
+                .hasMessageContaining("TOOL_REQUESTER_MISMATCH");
+    }
+
     private static ObjectProvider<DeepSeekChatGateway> fixedProvider(DeepSeekChatGateway gateway) {
         return new ObjectProvider<>() {
             @Override
