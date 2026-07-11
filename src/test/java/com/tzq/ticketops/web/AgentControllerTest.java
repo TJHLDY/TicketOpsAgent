@@ -4,6 +4,7 @@ import com.tzq.ticketops.agent.AgentOrchestrator;
 import com.tzq.ticketops.agent.AgentExecutionLog;
 import com.tzq.ticketops.agent.AgentExecutionLogRepository;
 import com.tzq.ticketops.agent.TicketCategory;
+import com.tzq.ticketops.observability.AgentTelemetry;
 import com.tzq.ticketops.ticket.TicketService;
 import org.junit.jupiter.api.Test;
 
@@ -19,7 +20,8 @@ class AgentControllerTest {
         AgentController controller = new AgentController(
                 AgentOrchestrator.createDefault(),
                 ticketService,
-                new NoopLogRepository()
+                new NoopLogRepository(),
+                AgentTelemetry.noop()
         );
 
         ChatResponse response = controller.chat(new ChatRequest(

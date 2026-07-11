@@ -22,7 +22,7 @@ This is small, but spreads metric names, tag policy, and privacy decisions acros
 
 ### 3. Dedicated telemetry boundary backed by Micrometer
 
-This is the selected approach. `AgentTelemetry` owns metric names, bounded tag normalization, timing, and no-op behavior. `AgentOrchestrator` reports typed domain outcomes at the points where they become known. Spring wiring uses Micrometer; static test factories use the no-op implementation.
+This is the selected approach. `AgentTelemetry` owns metric names, bounded tag normalization, timing, and no-op behavior. `AgentController` owns the request timer so persistence failures cannot be reported as successful API requests, while `AgentOrchestrator` reports typed RAG, tool, pending-action, and shadow outcomes at the points where they become known. Spring wiring uses Micrometer; static test factories use the no-op implementation.
 
 ## Architecture
 
@@ -34,7 +34,7 @@ This is the selected approach. `AgentTelemetry` owns metric names, bounded tag n
 - `ticketops.pending.action`: counter tagged by known pending-action `type`.
 - `ticketops.shadow.decision`: counter tagged by bounded `status` and `fallback`.
 
-The request timer wraps the full deterministic user-facing pipeline. RAG and tool counters are emitted at the actual decision boundaries, not inferred from response text. Pending-action counters are emitted only after the response has a concrete audit-only proposal.
+The request timer wraps ticket creation, deterministic Agent processing, decision-summary update, and audit-log persistence. RAG and tool counters are emitted at the actual decision boundaries, not inferred from response text. Pending-action counters are emitted only after the response has a concrete audit-only proposal.
 
 Actuator exposes only `health`, `info`, and `metrics`. No Prometheus registry, tracing backend, dashboard, or production alerting stack is added in this phase.
 

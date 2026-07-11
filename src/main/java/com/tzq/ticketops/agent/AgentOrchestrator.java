@@ -8,6 +8,8 @@ import com.tzq.ticketops.agent.decision.DeepSeekLlmAgentDecisionService;
 import com.tzq.ticketops.agent.decision.DeterministicAgentDecisionService;
 import com.tzq.ticketops.agent.decision.LlmDecisionException;
 import com.tzq.ticketops.agent.decision.ToolIntent;
+import com.tzq.ticketops.observability.AgentTelemetry;
+import com.tzq.ticketops.observability.ShadowDecisionOutcome;
 import com.tzq.ticketops.rag.SopSearchService;
 import com.tzq.ticketops.rag.SopSearchResult;
 import com.tzq.ticketops.rag.SopSearchStatus;
@@ -43,6 +45,7 @@ public class AgentOrchestrator {
     private final String llmModel;
     private final String promptVersion;
     private final String schemaVersion;
+    private final AgentTelemetry telemetry;
 
     @Autowired
     public AgentOrchestrator(
@@ -53,7 +56,8 @@ public class AgentOrchestrator {
             @Value("${ticketops.agent.llm.model:deepseek-v4-flash}") String llmModel,
             @Value("${ticketops.agent.llm.prompt-version:deepseek-shadow-v2}") String promptVersion,
             @Value("${ticketops.agent.llm.schema-version:agent-decision-v1}") String schemaVersion,
-            ObjectProvider<DeepSeekLlmAgentDecisionService> shadowDecisionPortProvider
+            ObjectProvider<DeepSeekLlmAgentDecisionService> shadowDecisionPortProvider,
+            AgentTelemetry telemetry
     ) {
         this(
                 parseAgentMode(agentModeValue),
@@ -64,7 +68,8 @@ public class AgentOrchestrator {
                 llmProvider,
                 llmModel,
                 promptVersion,
-                schemaVersion
+                schemaVersion,
+                telemetry
         );
     }
 
@@ -77,7 +82,8 @@ public class AgentOrchestrator {
             String llmProvider,
             String llmModel,
             String promptVersion,
-            String schemaVersion
+            String schemaVersion,
+            AgentTelemetry telemetry
     ) {
         this.sopSearchService = sopSearchService;
         this.toolExecutor = toolExecutor;
@@ -88,6 +94,7 @@ public class AgentOrchestrator {
         this.llmModel = llmModel;
         this.promptVersion = promptVersion;
         this.schemaVersion = schemaVersion;
+        this.telemetry = telemetry;
     }
 
     public static AgentOrchestrator createDefault() {
@@ -100,7 +107,8 @@ public class AgentOrchestrator {
                 DEFAULT_LLM_PROVIDER,
                 DEFAULT_LLM_MODEL,
                 DEFAULT_PROMPT_VERSION,
-                DEFAULT_SCHEMA_VERSION
+                DEFAULT_SCHEMA_VERSION,
+                AgentTelemetry.noop()
         );
     }
 
@@ -120,7 +128,30 @@ public class AgentOrchestrator {
                 DEFAULT_LLM_PROVIDER,
                 DEFAULT_LLM_MODEL,
                 DEFAULT_PROMPT_VERSION,
-                DEFAULT_SCHEMA_VERSION
+                DEFAULT_SCHEMA_VERSION,
+                AgentTelemetry.noop()
+        );
+    }
+
+    public static AgentOrchestrator createWithDecisionMode(
+            AgentMode agentMode,
+            AgentDecisionPort shadowDecisionPort,
+            SopSearchService sopSearchService,
+            MockAccountStatusTool accountStatusTool,
+            MockUserPermissionsTool permissionsTool,
+            AgentTelemetry telemetry
+    ) {
+        return new AgentOrchestrator(
+                agentMode,
+                new DeterministicAgentDecisionService(),
+                shadowDecisionPort,
+                sopSearchService,
+                new ReadOnlyToolExecutor(accountStatusTool, permissionsTool, 1),
+                DEFAULT_LLM_PROVIDER,
+                DEFAULT_LLM_MODEL,
+                DEFAULT_PROMPT_VERSION,
+                DEFAULT_SCHEMA_VERSION,
+                telemetry
         );
     }
 
@@ -138,11 +169,36 @@ public class AgentOrchestrator {
                 DEFAULT_LLM_PROVIDER,
                 DEFAULT_LLM_MODEL,
                 DEFAULT_PROMPT_VERSION,
-                DEFAULT_SCHEMA_VERSION
+                DEFAULT_SCHEMA_VERSION,
+                AgentTelemetry.noop()
+        );
+    }
+
+    public static AgentOrchestrator createWithPrimaryDecision(
+            AgentDecisionPort decisionPort,
+            SopSearchService sopSearchService,
+            ReadOnlyToolExecutor toolExecutor,
+            AgentTelemetry telemetry
+    ) {
+        return new AgentOrchestrator(
+                AgentMode.DETERMINISTIC,
+                decisionPort,
+                null,
+                sopSearchService,
+                toolExecutor,
+                DEFAULT_LLM_PROVIDER,
+                DEFAULT_LLM_MODEL,
+                DEFAULT_PROMPT_VERSION,
+                DEFAULT_SCHEMA_VERSION,
+                telemetry
         );
     }
 
     public AgentResponse handle(AgentRequest request) {
+        return handleRequest(request);
+    }
+
+    private AgentResponse handleRequest(AgentRequest request) {
         AgentContext context = new AgentContext(request.requesterId(), request.title(), request.description());
         AgentDecision decision = decisionPort.decide(context);
         TicketCategory category = decision.category();
@@ -206,6 +262,7 @@ public class AgentOrchestrator {
     ) {
         String text = request.title() + "\n" + request.description();
         SopSearchResult searchResult = sopSearchService.search(ragQuery(sopQuery, text));
+        telemetry.recordRag(searchResult.status(), searchResult.embeddingProvider());
         if (searchResult.status() != SopSearchStatus.ACCEPTED) {
             return ragRejectedResponse(category, priority, riskLevel, traceEvents, searchResult);
         }
@@ -217,8 +274,10 @@ public class AgentOrchestrator {
         try {
             executionResult = toolExecutor.executeSingle(toolIntents, request.requesterId(), category);
         } catch (ToolExecutionRejectedException exception) {
+            telemetry.recordToolRejected(exception.toolName(), exception.reason());
             return toolRejectedResponse(category, priority, riskLevel, traceEvents, exception);
         }
+        telemetry.recordToolSuccess(executionResult.toolCall().toolName());
         ToolCallRecord toolCall = executionResult.toolCall();
         String appCode = toolCall.arguments().get("appCode");
         String resultSummary = toolCall.resultSummary();
@@ -234,6 +293,7 @@ public class AgentOrchestrator {
                     PendingActionType.GRANT_PERMISSION,
                     "等待人工确认后为账号 " + request.requesterId() + " 申请 " + appCode + " 权限"
             ));
+            telemetry.recordPendingAction(PendingActionType.GRANT_PERMISSION);
         } else {
             suggestion = "已查询到该用户在 " + appCode + " 的权限：" + resultSummary + "，建议核对系统侧角色缓存或转人工排查异常。";
             replyDraft = "您好，已查询到您在 " + appCode + " 已存在相关权限。我们会继续核对系统侧角色缓存或访问异常。";
@@ -315,6 +375,7 @@ public class AgentOrchestrator {
                 sopQuery,
                 request.title() + "\n" + request.description()
         ));
+        telemetry.recordRag(searchResult.status(), searchResult.embeddingProvider());
         if (searchResult.status() != SopSearchStatus.ACCEPTED) {
             return ragRejectedResponse(category, priority, riskLevel, traceEvents, searchResult);
         }
@@ -326,8 +387,10 @@ public class AgentOrchestrator {
         try {
             executionResult = toolExecutor.executeSingle(toolIntents, request.requesterId(), category);
         } catch (ToolExecutionRejectedException exception) {
+            telemetry.recordToolRejected(exception.toolName(), exception.reason());
             return toolRejectedResponse(category, priority, riskLevel, traceEvents, exception);
         }
+        telemetry.recordToolSuccess(executionResult.toolCall().toolName());
         ToolCallRecord toolCall = executionResult.toolCall();
         traceEvents.add(successfulToolTrace(executionResult));
 
@@ -341,6 +404,7 @@ public class AgentOrchestrator {
                     PendingActionType.UNLOCK_ACCOUNT,
                     "等待人工确认后解锁账号 " + request.requesterId()
             ));
+            telemetry.recordPendingAction(PendingActionType.UNLOCK_ACCOUNT);
         } else {
             suggestion = "只读查询显示账号状态为 " + toolCall.resultSummary()
                     + "，未生成账号解锁动作，建议人工核对登录失败原因。";
@@ -458,14 +522,19 @@ public class AgentOrchestrator {
 
     private TraceEvent shadowDecisionEvent(AgentContext context) {
         if (shadowDecisionPort == null) {
+            telemetry.recordShadow(ShadowDecisionOutcome.SKIPPED);
             return skippedShadowTraceEvent();
         }
         long startedAt = System.nanoTime();
         try {
-            return shadowTraceEvent(shadowDecisionPort.decide(context), elapsedMillis(startedAt));
+            TraceEvent event = shadowTraceEvent(shadowDecisionPort.decide(context), elapsedMillis(startedAt));
+            telemetry.recordShadow(ShadowDecisionOutcome.ACCEPTED);
+            return event;
         } catch (LlmDecisionException exception) {
+            telemetry.recordShadow(ShadowDecisionOutcome.FALLBACK);
             return failedShadowTraceEvent(exception.status(), elapsedMillis(startedAt));
         } catch (RuntimeException exception) {
+            telemetry.recordShadow(ShadowDecisionOutcome.FALLBACK);
             return failedShadowTraceEvent("API_ERROR", elapsedMillis(startedAt));
         }
     }
