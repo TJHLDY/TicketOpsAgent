@@ -173,13 +173,13 @@ The backend records aggregate Micrometer metrics for request duration/outcome, R
 After starting the application and creating a ticket, inspect the local endpoints:
 
 ```powershell
-Invoke-RestMethod http://localhost:8080/actuator/health
-Invoke-RestMethod http://localhost:8080/actuator/metrics/ticketops.agent.request
-Invoke-RestMethod http://localhost:8080/actuator/metrics/ticketops.rag.retrieval
-Invoke-RestMethod http://localhost:8080/actuator/metrics/ticketops.tool.execution
+Invoke-RestMethod http://127.0.0.1:8081/actuator/health
+Invoke-RestMethod http://127.0.0.1:8081/actuator/metrics/ticketops.agent.request
+Invoke-RestMethod http://127.0.0.1:8081/actuator/metrics/ticketops.rag.retrieval
+Invoke-RestMethod http://127.0.0.1:8081/actuator/metrics/ticketops.tool.execution
 ```
 
-Only `health`, `info`, and `metrics` are exposed. `/actuator/env` is not exposed. No Prometheus, Grafana, or external tracing backend is added in this MVP; the Actuator metrics endpoint is for local diagnostics. See [docs/observability/privacy-safe-observability.md](docs/observability/privacy-safe-observability.md) for the metric contract and privacy boundary.
+Only `health`, `info`, and `metrics` are exposed on the separate management server. It defaults to `127.0.0.1:8081`, so the business port does not serve `/actuator/*` and remote hosts cannot connect to the management listener. `/actuator/env` is not exposed. No Prometheus, Grafana, or external tracing backend is added in this MVP; the Actuator metrics endpoint is for local diagnostics. See [docs/observability/privacy-safe-observability.md](docs/observability/privacy-safe-observability.md) for the metric contract and privacy boundary.
 
 ## Scenario Acceptance
 

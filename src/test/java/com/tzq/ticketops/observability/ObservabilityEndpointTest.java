@@ -2,50 +2,78 @@ package com.tzq.ticketops.observability;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.boot.test.web.server.LocalManagementPort;
+import org.springframework.boot.test.web.server.LocalServerPort;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
-@AutoConfigureMockMvc
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "management.server.port=0"
+)
 class ObservabilityEndpointTest {
 
-    @Autowired
-    MockMvc mockMvc;
+    @LocalServerPort
+    int applicationPort;
+
+    @LocalManagementPort
+    int managementPort;
+
+    private final HttpClient client = HttpClient.newHttpClient();
 
     @Test
-    void exposesHealthAndAgentMetricsButNotEnvironment() throws Exception {
-        mockMvc.perform(post("/api/agent/chat")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "requesterId": "mock-user-001",
-                                  "title": "OA login failed",
-                                  "description": "The account is locked."
-                                }
-                                """))
-                .andExpect(status().isOk());
+    void exposesActuatorOnlyOnSeparateManagementServer() throws Exception {
+        HttpResponse<String> chat = send("POST", applicationPort, "/api/agent/chat", """
+                {
+                  "requesterId": "mock-user-001",
+                  "title": "OA login failed",
+                  "description": "The account is locked."
+                }
+                """);
+        assertThat(chat.statusCode()).isEqualTo(200);
 
-        mockMvc.perform(get("/actuator/health"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("UP"));
+        assertThat(send("GET", applicationPort, "/actuator/health", null).statusCode())
+                .isEqualTo(404);
 
-        mockMvc.perform(get("/actuator/metrics/ticketops.agent.request"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("ticketops.agent.request"))
-                .andExpect(jsonPath("$.measurements[0].value").isNumber())
-                .andExpect(jsonPath("$.availableTags[?(@.tag == 'outcome')]").exists())
-                .andExpect(jsonPath("$.availableTags[?(@.tag == 'category')]").exists())
-                .andExpect(jsonPath("$.availableTags[?(@.tag == 'risk')]").exists());
+        HttpResponse<String> health = send("GET", managementPort, "/actuator/health", null);
+        assertThat(health.statusCode()).isEqualTo(200);
+        assertThat(health.body()).contains("\"status\":\"UP\"");
 
-        mockMvc.perform(get("/actuator/env"))
-                .andExpect(status().isNotFound());
+        HttpResponse<String> metrics = send(
+                "GET",
+                managementPort,
+                "/actuator/metrics/ticketops.agent.request",
+                null
+        );
+        assertThat(metrics.statusCode()).isEqualTo(200);
+        assertThat(metrics.body())
+                .contains("ticketops.agent.request")
+                .contains("outcome")
+                .contains("category")
+                .contains("risk");
+
+        assertThat(send("GET", managementPort, "/actuator/env", null).statusCode())
+                .isEqualTo(404);
+    }
+
+    private HttpResponse<String> send(
+            String method,
+            int port,
+            String path,
+            String body
+    ) throws Exception {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path));
+        if (body == null) {
+            builder.method(method, HttpRequest.BodyPublishers.noBody());
+        } else {
+            builder.header("Content-Type", "application/json")
+                    .method(method, HttpRequest.BodyPublishers.ofString(body));
+        }
+        return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 }

@@ -36,7 +36,7 @@ This is the selected approach. `AgentTelemetry` owns metric names, bounded tag n
 
 The request timer wraps ticket creation, deterministic Agent processing, decision-summary update, and audit-log persistence. RAG and tool counters are emitted at the actual decision boundaries, not inferred from response text. Pending-action counters are emitted only after the response has a concrete audit-only proposal.
 
-Actuator exposes only `health`, `info`, and `metrics`. No Prometheus registry, tracing backend, dashboard, or production alerting stack is added in this phase.
+Actuator exposes only `health`, `info`, and `metrics` on a separate management server bound to `127.0.0.1`. The business port does not serve Actuator endpoints. No Prometheus registry, tracing backend, dashboard, or production alerting stack is added in this phase.
 
 ## Cardinality And Privacy Contract
 

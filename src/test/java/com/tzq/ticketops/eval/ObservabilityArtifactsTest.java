@@ -17,6 +17,8 @@ class ObservabilityArtifactsTest {
         assertThat(pom).contains("<artifactId>spring-boot-starter-actuator</artifactId>");
         assertThat(application)
                 .contains("include: health,info,metrics")
+                .contains("port: ${TICKETOPS_MANAGEMENT_PORT:8081}")
+                .contains("address: 127.0.0.1")
                 .contains("log-prompt: false")
                 .contains("log-completion: false")
                 .contains("include-error-logging: false")
@@ -51,8 +53,9 @@ class ObservabilityArtifactsTest {
 
         assertThat(readme)
                 .contains("## Privacy-Safe Observability")
-                .contains("Invoke-RestMethod http://localhost:8080/actuator/health")
-                .contains("Invoke-RestMethod http://localhost:8080/actuator/metrics/ticketops.agent.request")
+                .contains("Invoke-RestMethod http://127.0.0.1:8081/actuator/health")
+                .contains("Invoke-RestMethod http://127.0.0.1:8081/actuator/metrics/ticketops.agent.request")
+                .contains("business port does not serve `/actuator/*`")
                 .contains("prompt and completion content remain disabled")
                 .contains("No Prometheus, Grafana, or external tracing backend");
     }

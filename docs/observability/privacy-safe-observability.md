@@ -19,14 +19,14 @@ The low-cardinality values are enums, fixed outcomes, the two read-only tool nam
 Start the application and create at least one Agent request. Then inspect the health and metrics endpoints:
 
 ```powershell
-Invoke-RestMethod http://localhost:8080/actuator/health
-Invoke-RestMethod http://localhost:8080/actuator/metrics
-Invoke-RestMethod http://localhost:8080/actuator/metrics/ticketops.agent.request
-Invoke-RestMethod http://localhost:8080/actuator/metrics/ticketops.rag.retrieval
-Invoke-RestMethod http://localhost:8080/actuator/metrics/ticketops.tool.execution
+Invoke-RestMethod http://127.0.0.1:8081/actuator/health
+Invoke-RestMethod http://127.0.0.1:8081/actuator/metrics
+Invoke-RestMethod http://127.0.0.1:8081/actuator/metrics/ticketops.agent.request
+Invoke-RestMethod http://127.0.0.1:8081/actuator/metrics/ticketops.rag.retrieval
+Invoke-RestMethod http://127.0.0.1:8081/actuator/metrics/ticketops.tool.execution
 ```
 
-Only `health`, `info`, and `metrics` are exposed over HTTP. For example, `/actuator/env` remains unavailable. The metrics endpoint is a local diagnostics surface, not a production metrics backend.
+Only `health`, `info`, and `metrics` are exposed over HTTP. The management server defaults to the separate port `8081` and binds to `127.0.0.1`; the business port does not serve Actuator endpoints and remote hosts cannot connect to the management listener. `TICKETOPS_MANAGEMENT_PORT` can change the local port without widening the bind address. For example, `/actuator/env` remains unavailable. The metrics endpoint is a local diagnostics surface, not a production metrics backend.
 
 ## Privacy Contract
 
@@ -45,7 +45,7 @@ The trace and audit APIs still contain scenario evidence needed for this local p
 
 `MicrometerAgentTelemetryTest` verifies metric names, counts, tags, one-shot request completion, normalization of untrusted values, and absence of a supplied sensitive marker from meter metadata.
 
-`AgentOrchestratorTelemetryTest` verifies successful requests, RAG rejection, tool rejection, pending action creation, and shadow fallback against the real orchestrator path. `ObservabilityEndpointTest` verifies the exposed endpoint allowlist.
+`AgentOrchestratorTelemetryTest` verifies successful requests, RAG rejection, tool rejection, pending action creation, and shadow fallback against the real orchestrator path. `ObservabilityEndpointTest` starts separate application and management servers and verifies the management-only endpoint allowlist.
 
 ## Boundary
 
