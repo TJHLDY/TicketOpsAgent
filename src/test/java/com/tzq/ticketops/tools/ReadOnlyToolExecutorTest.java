@@ -45,6 +45,7 @@ class ReadOnlyToolExecutorTest {
         assertThat(result.toolCall().resultSummary()).isEqualTo("LOCKED");
         assertThat(result.budgetUsed()).isEqualTo(1);
         assertThat(result.budgetLimit()).isEqualTo(1);
+        assertThat(result.emptyResult()).isFalse();
         verify(accountStatusTool).getAccountStatus("mock-user-001");
         verifyNoInteractions(permissionsTool);
     }
@@ -65,6 +66,7 @@ class ReadOnlyToolExecutorTest {
 
         assertThat(result.toolCall().arguments()).containsEntry("appCode", "CRM");
         assertThat(result.toolCall().resultSummary()).isEqualTo("CRM_VIEW");
+        assertThat(result.emptyResult()).isFalse();
         verify(permissionsTool).getUserPermissions("mock-user-005", "CRM");
         verifyNoInteractions(accountStatusTool);
     }

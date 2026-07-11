@@ -9,6 +9,7 @@ import com.tzq.ticketops.rag.SopSearchService;
 import com.tzq.ticketops.tools.MockAccountStatusTool;
 import com.tzq.ticketops.tools.MockUserPermissionsTool;
 import com.tzq.ticketops.tools.ReadOnlyToolExecutor;
+import com.tzq.ticketops.tools.UserPermissionsResult;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -142,6 +143,34 @@ class AgentOrchestratorTest {
                         "threshold=0.3",
                         "provider=offline"
                 );
+    }
+
+    @Test
+    void doesNotTreatPermissionCodeNamedNoneAsAnEmptyPermissionResult() {
+        MockUserPermissionsTool permissionsTool = new MockUserPermissionsTool() {
+            @Override
+            public UserPermissionsResult getUserPermissions(String userId, String appCode) {
+                return new UserPermissionsResult(userId, appCode, List.of("NONE"));
+            }
+        };
+        AgentOrchestrator orchestrator = AgentOrchestrator.createWithDecisionMode(
+                AgentMode.DETERMINISTIC,
+                null,
+                SopSearchService.createOffline(0.30),
+                new MockAccountStatusTool(),
+                permissionsTool
+        );
+
+        AgentResponse response = orchestrator.handle(new AgentRequest(
+                "mock-user-005",
+                "CRM 权限申请",
+                "我访问 CRM 提示无权访问，请核对权限。"
+        ));
+
+        assertThat(response.toolCalls()).singleElement()
+                .satisfies(call -> assertThat(call.resultSummary()).isEqualTo("NONE"));
+        assertThat(response.pendingActions()).isEmpty();
+        assertThat(response.suggestion()).contains("已查询到", "权限：NONE");
     }
 
     @Test

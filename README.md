@@ -21,7 +21,7 @@ The current MVP verifies a controllable backend agent chain:
 - Spring AI 2.0.0 BOM with DeepSeek starter support.
 - PostgreSQL Docker Compose profile for local persistence.
 - H2 default profile for fast tests.
-- 106 automated tests passing at the latest verification.
+- 107 automated tests passing at the latest verification.
 - Spring AI `VectorStoreRetriever` retrieval with source citations and low-similarity refusal.
 - Offline feature-hash embedding for deterministic, key-free tests and demos.
 - Optional local ONNX Transformers profile for neural embeddings without a cloud API key.
@@ -225,7 +225,7 @@ The deterministic path remains the user-facing main flow. The DeepSeek path is a
 
 Latest local validation:
 
-- `mvn test`: 106 tests PASS
+- `mvn test`: 107 tests PASS
 - `scripts\accept.ps1`: PASS
 - Secret scan: PASS
 - Shadow eval: 34 cases

@@ -54,6 +54,8 @@ A rejection produces zero successful tool calls and zero pending actions. The re
 
 Successful invocation does not automatically authorize a later action. The account flow proposes `UNLOCK_ACCOUNT` only when the validated read result is `LOCKED`; other account states produce no unlock pending action.
 
+Business decisions use the structured `emptyResult` field, not the display summary. A real permission code whose text is `NONE` is therefore treated as existing data rather than confused with an empty permission list.
+
 ## Boundary
 
 - No write tool exists.
@@ -65,4 +67,4 @@ Successful invocation does not automatically authorize a later action. The accou
 
 ## Verification
 
-`ReadOnlyToolExecutorTest` covers accepted account/permission calls, normalization, allowlist rejection, category mismatch, requester mismatch, exact schemas, supported app codes, null input, missing intents, and budget overflow. `AgentOrchestratorTest` proves that a malicious primary intent is stopped after RAG and before tool or pending-action side effects, and that an `ACTIVE` result does not produce an unlock proposal.
+`ReadOnlyToolExecutorTest` covers accepted account/permission calls, normalization, allowlist rejection, category mismatch, requester mismatch, exact schemas, supported app codes, null input, missing intents, and budget overflow. `AgentOrchestratorTest` proves that a malicious primary intent is stopped after RAG and before tool or pending-action side effects, that an `ACTIVE` result does not produce an unlock proposal, and that a permission code named `NONE` is not mistaken for an empty result.

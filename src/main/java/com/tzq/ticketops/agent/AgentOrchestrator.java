@@ -227,7 +227,7 @@ public class AgentOrchestrator {
         List<PendingAction> pendingActions = new ArrayList<>();
         String suggestion;
         String replyDraft;
-        if ("NONE".equals(resultSummary)) {
+        if (executionResult.emptyResult()) {
             suggestion = "未查询到该用户在 " + appCode + " 的现有权限，建议提交权限申请并等待审批。";
             replyDraft = "您好，当前未查询到您在 " + appCode + " 的权限记录。建议提交权限申请，待审批通过后由 IT 支持人员处理。";
             pendingActions.add(new PendingAction(

@@ -97,7 +97,8 @@ public class ReadOnlyToolExecutor {
             return result(
                     GET_ACCOUNT_STATUS,
                     Map.of("userId", args.userId()),
-                    result.status().name()
+                    result.status().name(),
+                    false
             );
         } catch (RuntimeException exception) {
             throw rejected(ToolRejectionReason.TOOL_INVOCATION_FAILED, GET_ACCOUNT_STATUS);
@@ -120,7 +121,8 @@ public class ReadOnlyToolExecutor {
             return result(
                     GET_USER_PERMISSIONS,
                     Map.of("userId", args.userId(), "appCode", args.appCode()),
-                    resultSummary
+                    resultSummary,
+                    result.permissionCodes().isEmpty()
             );
         } catch (RuntimeException exception) {
             throw rejected(ToolRejectionReason.TOOL_INVOCATION_FAILED, GET_USER_PERMISSIONS);
@@ -130,12 +132,14 @@ public class ReadOnlyToolExecutor {
     private ToolExecutionResult result(
             String toolName,
             Map<String, String> arguments,
-            String resultSummary
+            String resultSummary,
+            boolean emptyResult
     ) {
         return new ToolExecutionResult(
                 new ToolCallRecord(toolName, arguments, resultSummary),
                 1,
-                maxCallsPerRequest
+                maxCallsPerRequest,
+                emptyResult
         );
     }
 
